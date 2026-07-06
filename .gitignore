@@ -221,3 +221,6 @@ siyeong/
 # Vector DB (재생성 가능, 용량 문제로 제외)
 db/
 Siyeong/db/
+privacy_guideline_extract/
+raw/
+*.pdf
