@@ -44,7 +44,7 @@ collection = client.get_or_create_collection(
     embedding_function=embedding_fn,
 )
 
-
+ㅎ
 ARTICLE_PATTERN = re.compile(r"(?=제\s*\d+조(?:의\s*\d+)?\s*\()")
 GUIDELINE_PATTERN = re.compile(r"(?=^\s*\d+\.\s+.+$)", re.MULTILINE)
 ARTICLE_NO_PATTERN = re.compile(r"제\s*(\d+조(?:의\s*\d+)?)")

@@ -224,3 +224,19 @@ Siyeong/db/
 privacy_guideline_extract/
 raw/
 *.pdf
+
+# ChromaDB
+db/
+
+# OCR / extraction temp files
+*_raw_ocr.txt
+raw_ocr.txt
+privacy_guideline_extract/
+converted/
+ocr_output/
+
+# Original PDFs: keep local only
+*.pdf
+
+# Keep folder placeholders
+!.gitkeep
