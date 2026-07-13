@@ -1,0 +1,53 @@
+from langgraph.graph import StateGraph, START, END
+
+from agent.state import FinePrintState
+from agent.nodes import (
+    classify_intent,
+    retrieve_context,
+    generate_answer,
+    verify_answer,
+    improve_strategy,
+    generate_final_answer,
+)
+
+# 무한 루프 방지!
+def route_verification(state: FinePrintState):
+    status = state["verification_status"]
+    retry_count = state["retry_count"]
+
+    if status == "PASS":
+        return "pass"
+    
+    if retry_count >= 2:
+        return "max_retry"
+
+    return "fail"
+
+builder = StateGraph(FinePrintState)
+
+builder.add_node("classify_intent", classify_intent)
+builder.add_node("retrieve_context", retrieve_context)
+builder.add_node("generate_answer", generate_answer)
+builder.add_node("verify_answer", verify_answer)
+builder.add_node("improve_strategy", improve_strategy)
+builder.add_node("generate_final_answer", generate_final_answer)
+
+builder.add_edge(START, "classify_intent")
+builder.add_edge("classify_intent", "retrieve_context")
+builder.add_edge("retrieve_context", "generate_answer")
+builder.add_edge("generate_answer", "verify_answer")
+
+builder.add_conditional_edges(
+    "verify_answer",
+    route_verification,
+    {
+        "pass":"generate_final_answer",
+        "fail":"improve_strategy",
+        "max_retry":"generate_final_answer"
+    }
+)
+
+builder.add_edge("improve_strategy", "retrieve_context")
+builder.add_edge("generate_final_answer", END)
+
+graph = builder.compile()
