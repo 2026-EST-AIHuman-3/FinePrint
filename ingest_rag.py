@@ -45,18 +45,21 @@ collection = client.get_or_create_collection(
 )
 
 
-def check_document_exists(service_name: str) -> bool:
-    """이 서비스의 약관이 DB에 이미 존재하는지 확인 (Tavily 크롤링 여부 결정용).
+def check_document_exists(service_name: str, doc_subtype: str | None = None) -> bool:
+    """이 서비스의 (특정 종류) 약관/정책이 DB에 이미 존재하는지 확인 (Tavily 크롤링 여부 결정용).
     file_name이 아닌 service_name 기준으로 체크한다 —
-    크롤링 전 시점에는 아직 file_name을 알 수 없기 때문."""
-    results = collection.get(
-        where={
-            "$and": [
-                {"service_name": service_name},
-                {"type": "terms"},
-            ]
-        }
-    )
+    크롤링 전 시점에는 아직 file_name을 알 수 없기 때문.
+    doc_subtype을 지정하면 "이용약관"과 "개인정보처리방침"처럼 같은 서비스의
+    서로 다른 문서 종류를 구분해서 확인할 수 있다."""
+    conditions = [
+        {"service_name": service_name},
+        {"type": "terms"},
+    ]
+    if doc_subtype is not None:
+        conditions.append({"doc_subtype": doc_subtype})
+
+    where = conditions[0] if len(conditions) == 1 else {"$and": conditions}
+    results = collection.get(where=where)
     return len(results["ids"]) > 0
 
 ARTICLE_PATTERN = re.compile(r"(?=제\s*\d+\s*조(?:\s*의\s*\d+)?)")
@@ -184,6 +187,27 @@ def infer_service_name(path: Path, doc_type: str) -> str:
     return "unknown"
 
 
+DOC_SUBTYPE_KEYWORDS = {
+    "privacy_policy": ["개인정보", "프라이버시", "privacy"],
+    "refund_policy": ["환불", "취소", "refund"],
+    "payment_policy": ["결제", "자동결제", "payment"],
+    "terms_of_use": ["이용약관", "서비스약관", "이용규칙", "terms"],
+}
+
+
+def infer_doc_subtype(path: Path) -> str:
+    """파일명 키워드로 문서 종류를 구분 (이용약관 / 개인정보처리방침 / 환불정책 등).
+    같은 service_name이라도 문서 종류가 다르면 check_document_exists에서
+    별개로 취급해야 하므로 별도 필드로 관리한다."""
+    name = path.stem
+
+    for subtype, keywords in DOC_SUBTYPE_KEYWORDS.items():
+        if any(keyword in name for keyword in keywords):
+            return subtype
+
+    return "unknown"
+
+
 def clean_scraped_text(text: str) -> str:
     """웹 크롤링(아코디언/라벨 UI 등)으로 수집된 문서의 노이즈 정리."""
     text = re.sub(r"[ \t]+", " ", text)
@@ -286,9 +310,145 @@ def extract_article(chunk: str) -> str:
     return match.group(0).replace(" ", "") if match else "unknown"
 
 
-def make_chunk_id(path: Path, index: int, chunk: str) -> str:
-    raw = f"{path.as_posix()}::{index}::{chunk[:80]}"
+def make_chunk_id(source_id: str, index: int, chunk: str) -> str:
+    raw = f"{source_id}::{index}::{chunk[:80]}"
     return hashlib.sha1(raw.encode("utf-8")).hexdigest()
+
+
+def delete_by_source(source_id: str) -> None:
+    """같은 소스(파일 경로 / URL / 직접입력 식별자)에 속한 기존 청크를 전부 삭제.
+    내용이 조금이라도 바뀌면 청크 경계/개수/ID가 통째로 달라지므로,
+    upsert만으로는 구버전 청크가 잔존하는 문제를 막는다."""
+    existing = collection.get(where={"source": source_id})
+    if existing["ids"]:
+        collection.delete(ids=existing["ids"])
+        print(f"[CLEANUP] 기존 청크 {len(existing['ids'])}개 삭제 (재삽입 전): {source_id}")
+
+
+def upsert_chunks(
+    source_id: str,
+    source_label: str,
+    doc_type: str,
+    service_name: str,
+    chunks: list[str],
+    source_kind: str = "file",
+    doc_subtype: str = "unknown",
+) -> None:
+    delete_by_source(source_id)
+
+    if not chunks:
+        return
+
+    ids = []
+    documents = []
+    metadatas = []
+
+    for index, chunk in enumerate(chunks):
+        ids.append(make_chunk_id(source_id, index, chunk))
+        documents.append(chunk)
+        metadatas.append(
+            {
+                "type": doc_type,
+                "doc_subtype": doc_subtype,  # terms_of_use / privacy_policy / refund_policy 등
+                "service_name": service_name,
+                "source": source_id,
+                "source_file": source_label,
+                "source_kind": source_kind,  # file / url / pasted
+                "chunk_index": index,
+                "article": extract_article(chunk),
+                "content_hash": hashlib.md5(chunk.encode("utf-8")).hexdigest(),
+            }
+        )
+
+    # 청크마다 upsert를 반복 호출하지 않고 한 번에 배치로 전송 (임베딩 계산도 배치로 처리됨)
+    collection.upsert(ids=ids, documents=documents, metadatas=metadatas)
+
+
+def ingest_text(
+    source_id: str,
+    source_label: str,
+    doc_type: str,
+    service_name: str,
+    text: str,
+    source_kind: str = "file",
+    doc_subtype: str = "unknown",
+) -> bool:
+    """핵심 인제스트 로직. 파일이든 URL이든 직접입력이든,
+    "고유 식별자 + 라벨 + 텍스트"만 있으면 동일하게 처리한다."""
+    if not text or not text.strip():
+        print(f"[SKIP] 비어 있는 텍스트: {source_label}")
+        return False
+
+    text = clean_scraped_text(text)
+    chunks = chunk_text(text, doc_type)
+
+    if not chunks:
+        print(f"[SKIP] 청킹 결과 없음: {source_label}")
+        return False
+
+    upsert_chunks(source_id, source_label, doc_type, service_name, chunks, source_kind, doc_subtype)
+    print(f"[DONE] {source_label} -> {len(chunks)} chunks")
+    return True
+
+
+ALLOWED_DOC_TYPES = {"law", "guideline", "terms"}
+
+
+def _validate_manual_input(service_name: str, doc_type: str) -> None:
+    """파일 경로 기반 추론(infer_doc_type/infer_service_name)의 안전망이 없는
+    URL/직접입력 경로 전용 검증. 잘못된 값을 조용히 통과시키지 않고 즉시 실패시킨다."""
+    if not service_name or not service_name.strip():
+        raise ValueError("service_name은 빈 값일 수 없습니다.")
+
+    if doc_type not in ALLOWED_DOC_TYPES:
+        raise ValueError(
+            f"doc_type='{doc_type}'은 허용되지 않습니다. {ALLOWED_DOC_TYPES} 중 하나여야 합니다."
+        )
+
+
+def ingest_from_url(
+    url: str,
+    service_name: str,
+    extracted_text: str,
+    doc_type: str = "terms",
+    doc_subtype: str = "terms_of_use",
+) -> bool:
+    """URL에서 약관 본문을 성공적으로 추출한 경우 호출.
+    실제 크롤링/추출(Tavily, Playwright, Trafilatura 등)은 이 함수 밖(탐색 담당 파트)에서 수행하고,
+    추출된 텍스트만 여기로 넘긴다."""
+    _validate_manual_input(service_name, doc_type)
+
+    return ingest_text(
+        source_id=url,
+        source_label=url,
+        doc_type=doc_type,
+        service_name=service_name.strip(),
+        text=extracted_text,
+        source_kind="url",
+        doc_subtype=doc_subtype,
+    )
+
+
+def ingest_from_pasted_text(
+    service_name: str,
+    pasted_text: str,
+    doc_type: str = "terms",
+    doc_subtype: str = "terms_of_use",
+) -> bool:
+    """URL에서 약관을 추출하지 못해 사용자가 직접 붙여넣은 텍스트를 처리."""
+    _validate_manual_input(service_name, doc_type)
+
+    service_name = service_name.strip()
+    source_id = f"pasted::{service_name}::{hashlib.sha1(pasted_text.encode('utf-8')).hexdigest()[:12]}"
+    return ingest_text(
+        source_id=source_id,
+        source_label=f"{service_name} (사용자 직접입력)",
+        doc_type=doc_type,
+        service_name=service_name,
+        text=pasted_text,
+        source_kind="pasted",
+        doc_subtype=doc_subtype,
+    )
 
 
 def iter_source_files(base_path: str = RAG_PATH) -> list[Path]:
@@ -302,45 +462,10 @@ def iter_source_files(base_path: str = RAG_PATH) -> list[Path]:
     return sorted(files)
 
 
-def delete_by_source(path: Path) -> None:
-    """같은 소스 파일에 속한 기존 청크를 전부 삭제 (재삽입 전 정리용).
-    내용이 조금이라도 바뀌면 청크 경계/개수/ID가 통째로 달라지므로,
-    upsert만으로는 구버전 청크가 고아로 남는 문제를 막는다."""
-    existing = collection.get(where={"source": str(path)})
-    if existing["ids"]:
-        collection.delete(ids=existing["ids"])
-        print(f"[CLEANUP] 기존 청크 {len(existing['ids'])}개 삭제 (재삽입 전): {path.name}")
-
-
-def upsert_chunks(
-    path: Path,
-    doc_type: str,
-    service_name: str,
-    chunks: list[str],
-) -> None:
-    delete_by_source(path)
-
-    for index, chunk in enumerate(chunks):
-        collection.upsert(
-            ids=[make_chunk_id(path, index, chunk)],
-            documents=[chunk],
-            metadatas=[
-                {
-                    "type": doc_type,
-                    "service_name": service_name,
-                    "source": str(path),
-                    "source_file": path.name,
-                    "chunk_index": index,
-                    "article": extract_article(chunk),
-                    "content_hash": hashlib.md5(chunk.encode("utf-8")).hexdigest(),
-                }
-            ],
-        )
-
-
 def ingest_file(path: Path) -> bool:
     doc_type = infer_doc_type(path)
     service_name = infer_service_name(path, doc_type)
+    doc_subtype = infer_doc_subtype(path)
 
     if doc_type == "unknown":
         print(
@@ -349,34 +474,27 @@ def ingest_file(path: Path) -> bool:
         )
 
     print(f"[LOAD] {path}")
-    print(f"[META] type={doc_type}, service_name={service_name}")
+    print(f"[META] type={doc_type}, service_name={service_name}, doc_subtype={doc_subtype}")
 
     text = load_file(path)
 
-    if not text or not text.strip():
-        print(f"[SKIP] 비어 있거나 읽을 수 없는 문서: {path}")
-        return False
-
-    text = clean_scraped_text(text)
-
-    chunks = chunk_text(text, doc_type)
-
-    if not chunks:
-        print(f"[SKIP] 청킹 결과 없음: {path}")
-        return False
-
-    upsert_chunks(path, doc_type, service_name, chunks)
-
-    print(f"[DONE] {path.name} -> {len(chunks)} chunks")
-    return True
+    return ingest_text(
+        source_id=path.as_posix(),
+        source_label=path.name,
+        doc_type=doc_type,
+        service_name=service_name,
+        text=text or "",
+        doc_subtype=doc_subtype,
+    )
 
 
-def sweep_orphaned_sources(base_path: str = RAG_PATH) -> None:
-    """RAG 폴더에서 삭제되었거나 이름이 바뀐 파일의 잔존 청크를 DB에서 정리.
-    ingest_all() 전체 실행 후 1회 호출."""
+def sweep_stale_sources(base_path: str = RAG_PATH) -> None:
+    """RAG 폴더에서 삭제되었거나 이름이 바뀐 '파일' 소스의 잔존 청크를 DB에서 정리.
+    ingest_all() 전체 실행 후 1회 호출.
+    URL/직접입력 소스(source_kind != "file")는 파일 시스템 스캔 대상이 아니므로 건드리지 않는다."""
     current_sources = {p.as_posix() for p in iter_source_files(base_path)}
 
-    existing = collection.get()
+    existing = collection.get(where={"source_kind": "file"})
     ids_to_delete = [
         chunk_id
         for chunk_id, meta in zip(existing["ids"], existing["metadatas"])
@@ -387,7 +505,7 @@ def sweep_orphaned_sources(base_path: str = RAG_PATH) -> None:
         collection.delete(ids=ids_to_delete)
         print(f"[CLEANUP] 원본이 사라진(삭제/이름변경) 청크 {len(ids_to_delete)}개 정리")
     else:
-        print("[CLEANUP] 정리할 고아 청크 없음")
+        print("[CLEANUP] 정리할 구버전 청크 없음")
 
 
 def ingest_all(base_path: str = RAG_PATH) -> None:
@@ -411,7 +529,7 @@ def ingest_all(base_path: str = RAG_PATH) -> None:
             print(f"[ERROR] 처리 실패: {path} / {exc}")
             fail_count += 1
 
-    sweep_orphaned_sources(base_path)
+    sweep_stale_sources(base_path)
 
     print()
     print(f"[SUMMARY] 성공: {success_count}")
