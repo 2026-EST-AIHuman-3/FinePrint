@@ -248,3 +248,69 @@ def generate_final_answer(state: FinePrintState):
     return {
         "final_answer": result.model_dump() # Pydantic 객체를 딕셔너리로 바꿈
     }
+
+# 근거 부족 최종 답변 생성 모듈
+def generate_insufficient_evidence_answer(
+    state: FinePrintState
+):
+    service_name = state["service_name"]
+    user_question = state["user_question"]
+
+    primary_intent = state["primary_intent"]
+    related_intents = state["related_intents"]
+
+    terms_context = state["terms_context"]
+    consumer_context = state["consumer_protection_context"]
+
+    verification_reason = state["verification_reason"]
+    missing_evidence = state["missing_evidence"]
+
+    prompt = f"""
+    당신은 구독형 서비스 소비자 문제 해결을 지원하는
+    FinePrint AI Agent입니다.
+
+    현재 답변은 근거 검증을 통과하지 못했으며,
+    추가 검색 이후에도 충분한 근거를 확보하지 못했습니다.
+
+    [서비스명]
+    {service_name}
+
+    [사용자 문제 상황]
+    {user_question}
+
+    [주요 문제 유형]
+    {primary_intent}
+
+    [관련 문제 유형]
+    {related_intents}
+
+    [현재 확인된 약관 근거]
+    {terms_context}
+
+    [현재 확인된 소비자 보호 근거]
+    {consumer_context}
+
+    [검증 실패 사유]
+    {verification_reason}
+
+    [부족한 근거]
+    {missing_evidence}
+
+    사용자에게 근거 부족 상태를 명확하게 안내하세요.
+
+    다음 원칙을 반드시 지키세요.
+
+    1. 모든 답변은 반드시 한국어로 작성하세요.
+    2. 현재 확인된 근거에 있는 내용만 설명하세요.
+    3. 환불 가능, 위법, 보상 가능 여부를 확정하지 마세요.
+    4. 근거에 없는 대응 방법을 새롭게 제안하지 마세요.
+    5. 확인되지 않은 내용은 확인할 수 없다고 명확히 표현하세요.
+    6. 추가 판단에 필요한 정보와 사용자에게 확인할 질문을 중심으로 작성하세요.
+    7. 현재 확보된 문서만으로 충분한 근거를 확인하기 어렵다는 점을 명시하세요.
+    """
+
+    result = final_answer_llm.invoke(prompt)
+
+    return {
+        "final_answer": result.model_dump()
+    }

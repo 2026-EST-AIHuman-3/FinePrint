@@ -8,6 +8,7 @@ from agent.nodes import (
     verify_answer,
     improve_strategy,
     generate_final_answer,
+    generate_insufficient_evidence_answer
 )
 
 # 무한 루프 방지!
@@ -17,9 +18,9 @@ def route_verification(state: FinePrintState):
 
     if status == "PASS":
         return "pass"
-    
+
     if retry_count >= 2:
-        return "max_retry"
+        return "insufficient"
 
     return "fail"
 
@@ -31,6 +32,10 @@ builder.add_node("generate_answer", generate_answer)
 builder.add_node("verify_answer", verify_answer)
 builder.add_node("improve_strategy", improve_strategy)
 builder.add_node("generate_final_answer", generate_final_answer)
+builder.add_node(
+    "generate_insufficient_evidence_answer",
+    generate_insufficient_evidence_answer,
+)
 
 builder.add_edge(START, "classify_intent")
 builder.add_edge("classify_intent", "retrieve_context")
@@ -41,13 +46,17 @@ builder.add_conditional_edges(
     "verify_answer",
     route_verification,
     {
-        "pass":"generate_final_answer",
-        "fail":"improve_strategy",
-        "max_retry":"generate_final_answer"
-    }
+        "pass": "generate_final_answer",
+        "fail": "improve_strategy",
+        "insufficient": "generate_insufficient_evidence_answer",
+    },
 )
 
 builder.add_edge("improve_strategy", "retrieve_context")
 builder.add_edge("generate_final_answer", END)
+builder.add_edge(
+    "generate_insufficient_evidence_answer",
+    END,
+)
 
 graph = builder.compile()
