@@ -1,7 +1,7 @@
 # FinePrint
 RAG-based AI Agent for analyzing subscription service terms and policies.
 
-PDF 파싱 및 청킹, 임베딩 후 ChromaDB에 저장하는 py파일입니다. (PDF_Test.py)
+PDF 파싱 및 청킹, 임베딩 후 ChromaDB에 저장하는 파일입니다. (`ingest_rag.py`)
 RAG에 자료를 넣어둔 후 py파일을 실행합니다.
 
 ## 구조
@@ -13,7 +13,7 @@ RAG에 자료를 넣어둔 후 py파일을 실행합니다.
 ## 사용 흐름
 RAG/ 폴더에 약관/법령 문서 추가 <br>
 　　　　　　　↓ <br>
-python ingest_rag.py (일괄 임베딩) <br>
+python ingest_rag.py (일괄 임베딩) 　,　 기존 source는 삭제 후 재삽입(upsert)  
 　　　　　　　↓ <br>
 ChromaDB에 저장됨 (search_utils로 검색 가능)<br>
 
@@ -33,10 +33,10 @@ RAG/
 ├── 넷플릭스/ │  
 ├── 카카오/ │  
 ├── 쿠팡/ │  
-├── 유튜브/ │
+├── 유튜브/ │  
 ├── 티빙/ │  
-└── 한국소비자원/ │
-
+└── 한국소비자원/ │  
+　└── faq.json │
 
 
 **파일명 규칙 - `doc_subtype` 자동 추론:**
@@ -79,7 +79,8 @@ from config import DB_PATH, COLLECTION_NAME, EMBEDDING_MODEL
 DB 접속/검색 코드에서 위 3개 값을 직접 하드코딩하지 말고 **반드시 `config.py`에서 import**해서 쓰세요. <br>
 임베딩 모델이 인제스트 때와 검색 때가 다르면 벡터 공간이 어긋나서 검색이 전부 이상하게 나옵니다.
 
-```
+
+```python
 import chromadb
 from chromadb.utils import embedding_functions
 from config import DB_PATH, COLLECTION_NAME, EMBEDDING_MODEL
@@ -91,6 +92,7 @@ collection = client.get_collection(
         model_name=EMBEDDING_MODEL
     ),
 )
+```
 ---
 
 ## 사용 가능한 함수
@@ -178,7 +180,7 @@ DB 상태를 한눈에 확인:
 - 서비스별 청크 수
 - 문서 타입(type)별 청크 수
 - doc_subtype별 청크 수
-- source_kind별 청크 수 (file/url/pasted/faq)
+- source_kind별 청크 수 (file/url/pasted)
 - scope별 청크 수 (service_specific/shared)
 - 구버전 스키마 잔존 여부 체크 ⚠️
 
@@ -188,7 +190,7 @@ DB 상태를 한눈에 확인:
 
 | 필드 | 값 예시 | 설명 |
 |---|---|---|
-| `type` | `law` / `guideline` / `terms` | 법령 / 소비자보호 지침 / 서비스 약관 |
+| `type` | `law` / `guideline` / `terms` / 'faq' | 법령 / 소비자보호 지침 / 서비스 약관 / 질의응답 |
 | `doc_subtype` | `terms_of_use` / `privacy_policy` / `refund_policy` / `payment_policy` / `unknown` | 문서 종류 |
 | `service_name` | `넷플릭스`, `쿠팡` 등 (law/guideline은 `none`) | 서비스명 |
 | `source` | 파일경로 / URL / `pasted::...` | 원본 식별자 |
