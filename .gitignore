@@ -240,3 +240,6 @@ ocr_output/
 
 # Keep folder placeholders
 !.gitkeep
+
+# RAG 폴더 안의 PDF는 포함
+!RAG/**/*.pdf

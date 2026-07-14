@@ -28,10 +28,9 @@ from langchain_text_splitters import RecursiveCharacterTextSplitter
 from PyPDF2 import PdfReader
 
 
-DB_PATH = "./db"
+from config import DB_PATH, COLLECTION_NAME, EMBEDDING_MODEL
+
 RAG_PATH = "./RAG"
-COLLECTION_NAME = "RAG_system"
-EMBEDDING_MODEL = "paraphrase-multilingual-mpnet-base-v2"
 
 
 embedding_fn = embedding_functions.SentenceTransformerEmbeddingFunction(
@@ -117,6 +116,24 @@ def load_pdf(path: Path) -> str | None:
     return text
 
 
+def is_ocr_quality_acceptable(text: str, path_name: str) -> bool:
+    """OCR이 '성공'해도 실제로는 깨진 글자만 나온 경우를 걸러낸다."""
+    if len(text.strip()) < 100:
+        print(f"[WARNING] OCR 결과가 너무 짧습니다 ({len(text.strip())}자): {path_name}")
+        return False
+
+    korean_chars = sum(1 for c in text if "\uac00" <= c <= "\ud7a3")
+    korean_ratio = korean_chars / len(text) if text else 0
+    if korean_ratio < 0.1:
+        print(
+            f"[WARNING] OCR이 한글을 제대로 인식하지 못한 것으로 보입니다 "
+            f"(한글 비율 {korean_ratio:.1%}): {path_name}"
+        )
+        return False
+
+    return True
+
+
 def ocr_pdf(path: Path) -> str | None:
     try:
         from pdf2image import convert_from_path
@@ -136,7 +153,14 @@ def ocr_pdf(path: Path) -> str | None:
             text += pytesseract.image_to_string(image, lang="kor+eng") + "\n"
             print(f"[OCR] {path.name} - page {index + 1}/{len(images)}")
 
-        return text if text.strip() else None
+        if not text.strip():
+            return None
+
+        if not is_ocr_quality_acceptable(text, path.name):
+            print(f"[FAIL] OCR 품질 검증 실패, 정리된 .txt 파일 사용을 권장합니다: {path.name}")
+            return None
+
+        return text
 
     except Exception as exc:
         print(f"[ERROR] OCR 처리 실패: {exc}")
@@ -376,7 +400,7 @@ def make_chunk_id(source_id: str, index: int, chunk: str) -> str:
 def delete_by_source(source_id: str) -> None:
     """같은 소스(파일 경로 / URL / 직접입력 식별자)에 속한 기존 청크를 전부 삭제.
     내용이 조금이라도 바뀌면 청크 경계/개수/ID가 통째로 달라지므로,
-    upsert만으로는 구버전 청크가 잔존하는 문제를 막는다."""
+    upsert만으로는 구버전 청크가 고아로 남는 문제를 막는다."""
     existing = collection.get(where={"source": source_id})
     if existing["ids"]:
         collection.delete(ids=existing["ids"])
@@ -552,7 +576,7 @@ def ingest_file(path: Path) -> bool:
     )
 
 
-def sweep_stale_sources(base_path: str = RAG_PATH) -> None:
+def sweep_orphaned_sources(base_path: str = RAG_PATH) -> None:
     """RAG 폴더에서 삭제되었거나 이름이 바뀐 '파일' 소스의 잔존 청크를 DB에서 정리.
     ingest_all() 전체 실행 후 1회 호출.
     URL/직접입력 소스(source_kind != "file")는 파일 시스템 스캔 대상이 아니므로 건드리지 않는다."""
@@ -569,7 +593,7 @@ def sweep_stale_sources(base_path: str = RAG_PATH) -> None:
         collection.delete(ids=ids_to_delete)
         print(f"[CLEANUP] 원본이 사라진(삭제/이름변경) 청크 {len(ids_to_delete)}개 정리")
     else:
-        print("[CLEANUP] 정리할 잔존 청크 없음")
+        print("[CLEANUP] 정리할 고아 청크 없음")
 
 
 def ingest_all(base_path: str = RAG_PATH) -> None:
@@ -593,7 +617,7 @@ def ingest_all(base_path: str = RAG_PATH) -> None:
             print(f"[ERROR] 처리 실패: {path} / {exc}")
             fail_count += 1
 
-    sweep_stale_sources(base_path)
+    sweep_orphaned_sources(base_path)
 
     print()
     print(f"[SUMMARY] 성공: {success_count}")
