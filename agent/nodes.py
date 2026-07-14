@@ -55,6 +55,7 @@ def classify_intent(state: FinePrintState):
     - PAYMENT: 중복결제, 잘못된 금액 청구, 예상하지 못한 결제
     - PENALTY: 위약금, 중도해지 비용
     - CONTRACT_CHANGE: 가격, 약관, 서비스 조건 변경
+    - ACCOUNT_RESTRICTION: 계정 정지, 이용 제한, 접근 차단, 서비스 이용 중단
     - OTHER: 위 유형에 해당하지 않는 기타 문제
 
     사용자 문제의 핵심 원인이 되는 primary_intent 하나를 선택하세요.
@@ -64,6 +65,21 @@ def classify_intent(state: FinePrintState):
 
     primary_intent와 related_intents에 사용하는 값은
     반드시 위 문제 유형 중에서 선택하세요.
+
+    또한 사용자 질문이 FinePrint의 서비스 범위에 해당하는지 판단하세요.
+
+    다음과 관련된 질문은 is_in_scope를 True로 판단하세요.
+    - 구독형 서비스 약관 및 정책
+    - 자동결제 또는 자동갱신
+    - 해지 및 구독 취소
+    - 환불
+    - 결제 또는 청구 문제
+    - 위약금 또는 중도해지 비용
+    - 계약 및 서비스 조건 변경
+    - 구독 서비스 이용 중 발생한 소비자 문제
+
+    구독형 서비스 소비자 문제와 관련이 없는 질문은
+    is_in_scope를 False로 판단하세요.
     """
 
     result = intent_llm.invoke(prompt)
@@ -71,8 +87,8 @@ def classify_intent(state: FinePrintState):
     return {
         "primary_intent": result.primary_intent,
         "related_intents": result.related_intents,
+        "is_in_scope": result.is_in_scope
     }
-
 
 # Hybrid RAG 검색
 def retrieve_context(state: FinePrintState):
@@ -367,4 +383,16 @@ def generate_insufficient_evidence_answer(
 
     return {
         "final_answer": result.model_dump()
+    }
+
+# 서비스 범위 밖 질문 응답
+def generate_out_of_scope_answer(state: FinePrintState):
+    return {
+        "final_answer": {
+            "message": (
+                "해당 질문은 FinePrint가 지원하는 "
+                "구독형 서비스의 약관, 해지, 환불, 자동결제, "
+                "결제 및 정책 관련 소비자 문제 범위를 벗어납니다."
+            )
+        }
     }

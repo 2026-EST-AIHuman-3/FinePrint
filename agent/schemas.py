@@ -10,6 +10,14 @@ class IntentResult(BaseModel):
         description="핵심 문제와 직접 관련된 추가 문제 유형 목록"
     )
 
+    is_in_scope: bool = Field(
+        description=(
+            "사용자 질문이 구독형 서비스의 약관, 결제, 자동갱신, "
+            "해지, 환불, 위약금, 계약 조건 등 소비자 문제와 관련되면 True, "
+            "관련이 없으면 False"
+        )
+    )
+
 # 검증 결과
 class VerificationResult(BaseModel):
     status: str = Field(

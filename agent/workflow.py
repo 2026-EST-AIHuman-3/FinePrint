@@ -8,8 +8,16 @@ from agent.nodes import (
     verify_answer,
     improve_strategy,
     generate_final_answer,
-    generate_insufficient_evidence_answer
+    generate_insufficient_evidence_answer,
+    generate_out_of_scope_answer
 )
+
+# 분기 함수!
+def route_scope(state: FinePrintState):
+    if state["is_in_scope"]:
+        return "in_scope"
+
+    return "out_of_scope"
 
 # 무한 루프 방지!
 def route_verification(state: FinePrintState):
@@ -36,9 +44,23 @@ builder.add_node(
     "generate_insufficient_evidence_answer",
     generate_insufficient_evidence_answer,
 )
+builder.add_node(
+    "generate_out_of_scope_answer",
+    generate_out_of_scope_answer,
+)
+
 
 builder.add_edge(START, "classify_intent")
-builder.add_edge("classify_intent", "retrieve_context")
+
+builder.add_conditional_edges(
+    "classify_intent",
+    route_scope,
+    {
+        "in_scope": "retrieve_context",
+        "out_of_scope": "generate_out_of_scope_answer",
+    },
+)
+
 builder.add_edge("retrieve_context", "generate_answer")
 builder.add_edge("generate_answer", "verify_answer")
 
@@ -56,6 +78,10 @@ builder.add_edge("improve_strategy", "retrieve_context")
 builder.add_edge("generate_final_answer", END)
 builder.add_edge(
     "generate_insufficient_evidence_answer",
+    END,
+)
+builder.add_edge(
+    "generate_out_of_scope_answer",
     END,
 )
 
