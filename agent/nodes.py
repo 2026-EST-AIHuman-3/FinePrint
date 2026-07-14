@@ -5,11 +5,34 @@ from langchain.chat_models import init_chat_model
 
 load_dotenv()
 
-llm = init_chat_model("gpt-4o")
-intent_llm = llm.with_structured_output(IntentResult)
-verification_llm = llm.with_structured_output(VerificationResult)
-improvement_llm = llm.with_structured_output(ImprovementResult)
-final_answer_llm = llm.with_structured_output(FinalAnswerResult)
+judgment_llm = init_chat_model(
+    "gpt-4o",
+    temperature=0
+)
+# judgment_llm
+# ├─ 질문 의도 분류
+# └─ 근거 검증
+
+# → "판단"하는 작업
+# → 같은 입력이면 최대한 같은 결과가 중요
+# → temperature = 0
+
+generation_llm = init_chat_model(
+    "gpt-4o",
+    temperature=0.3
+)
+# generation_llm
+# ├─ 개선 전략 작성
+# └─ 최종 답변 작성
+
+# → 자연어를 "생성"하는 작업
+# → 어느 정도 표현 유연성 허용
+# → temperature = 0.3
+
+intent_llm = judgment_llm.with_structured_output(IntentResult)
+verification_llm = judgment_llm.with_structured_output(VerificationResult)
+improvement_llm = generation_llm.with_structured_output(ImprovementResult)
+final_answer_llm = generation_llm.with_structured_output(FinalAnswerResult)
 
 # 질문 의도 분류 모듈
 def classify_intent(state: FinePrintState):
@@ -53,22 +76,48 @@ def classify_intent(state: FinePrintState):
 
 # Hybrid RAG 검색
 def retrieve_context(state: FinePrintState):
-    # 임시 값!!
-    return {
+    # fail 경로 검증 임시 값!!
+    # return {
+    #     "terms_context": [
+    #         "해지 시 현재 결제 주기 종료일까지 서비스를 이용할 수 있습니다."
+    #     ],
+    #     "consumer_protection_context": [
+    #         "계속거래 계약 관련 소비자 보호 기준입니다."
+    #     ],
+    # }
+
+    # pass 경로 검증 임시 값!!!
+     return {
         "terms_context": [
-            "해지 시 현재 결제 주기 종료일까지 서비스를 이용할 수 있습니다."
+            (
+                "회원은 다음 결제일 이전까지 멤버십을 해지할 수 있으며, "
+                "해지 후에는 다음 결제 주기부터 요금이 청구되지 않습니다."
+            ),
+            (
+                "해지 완료 이후 시스템 오류로 추가 결제가 발생한 경우, "
+                "결제 내역 확인 후 해당 금액의 환불을 요청할 수 있습니다."
+            ),
         ],
         "consumer_protection_context": [
-            "계속거래 계약 관련 소비자 보호 기준입니다."
+            "소비자는 계속거래 계약의 해지를 요청할 수 있습니다."
         ],
     }
 
 # 쉬운 말 / 답변 생성
 def generate_answer(state: FinePrintState):
-    # 임시 답변!!
+    # 근거 없는 임시 답변!!
+    # return {
+    #     "draft_answer": (
+    #         "해지 이후 결제된 금액은 무조건 전액 환불받을 수 있습니다."
+    #     )
+    # }
+
+    # 근거에 따른 임시 답변!!!
     return {
         "draft_answer": (
-            "해지 이후 결제된 금액은 무조건 전액 환불받을 수 있습니다."
+            "확인된 약관에 따르면 해지 후에는 다음 결제 주기부터 "
+            "요금이 청구되지 않습니다. 또한 해지 완료 이후 시스템 오류로 "
+            "추가 결제가 발생한 경우 결제 내역 확인 후 환불을 요청할 수 있습니다."
         )
     }
 
@@ -234,6 +283,8 @@ def generate_final_answer(state: FinePrintState):
     6. 사용자가 실제로 확인하고 행동할 수 있도록 구체적으로 안내하세요.
     7. 근거가 부족한 부분은 추가 확인이 필요하다고 명확히 표현하세요.
     8. 문의문 초안은 사용자 상황에 맞게 자연스럽고 정중한 한국어로 작성하세요.
+    9. 문의문 초안은 반드시 사용자가 서비스 고객센터에 직접 문의하는 1인칭 관점으로 작성하세요. 
+       고객센터가 사용자에게 답변하는 형태로 작성하지 마세요.
 
     검증 상태가 FAIL인 경우,
     확인되지 않은 내용을 사실처럼 작성하지 마세요.

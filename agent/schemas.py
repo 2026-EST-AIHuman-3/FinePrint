@@ -71,10 +71,11 @@ class FinalAnswerResult(BaseModel):
 
     inquiry_draft: str = Field(
         description=(
-            "정중한 한국어 고객센터 문의문 초안. "
+            "사용자가 서비스 고객센터에 직접 보내는 "
+            "1인칭 관점의 정중한 한국어 고객센터 문의문 초안"
             "근거 없는 권리 주장이나 환불 요구를 하지 않고 "
             "사실관계와 처리 가능 여부를 확인하는 형태"
-        )
+            )
     )
 
     follow_up_questions: list[str] = Field(
