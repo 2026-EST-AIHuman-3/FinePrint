@@ -217,6 +217,24 @@ def clean_scraped_text(text: str) -> str:
     return text.strip()
 
 
+SHARED_SCOPE_MARKERS = [
+    "모든 서비스에 적용",
+    "전 서비스에 적용",
+    "서비스 전반에 적용",
+    "계열사가 제공하는 모든 서비스",
+    "그룹사 전체",
+]
+
+
+def infer_scope(text: str) -> str:
+    """구글 통합 개인정보처리방침처럼 특정 서비스 전용이 아니라
+    여러 서비스에 공통 적용되는 문서인지 본문 내용으로 감지.
+    (예: 유튜브 개인정보처리방침 = 구글 전체 서비스 공통 문서)
+    이런 문서는 서비스와 무관한 내용(Gmail, 검색 등)이 섞여 있을 수 있어서,
+    검색/답변 생성 단계에서 별도로 취급하는 게 안전하다."""
+    return "shared" if any(marker in text for marker in SHARED_SCOPE_MARKERS) else "service_specific"
+
+
 def is_heading_line(line: str) -> bool:
     line = line.strip()
     if not (2 <= len(line) <= 20):
@@ -271,38 +289,78 @@ def split_long_chunks(chunks: list[str], max_len: int = 1500) -> list[str]:
     return result
 
 
+def merge_short_chunks(chunks: list[str], min_len: int = 120) -> list[str]:
+    """너무 짧은 청크(예: 예시 목록 안에서 매번 1번부터 다시 시작하는
+    "1. 자동화된 결정에 대한 거부" 같은 항목 하나짜리 청크)를 다음 청크와 합친다.
+    split_long_chunks의 반대 짝: 저쪽은 "너무 긴 것"을, 이쪽은 "너무 짧아서
+    혼자서는 맥락이 없는 것"을 처리한다."""
+    if not chunks:
+        return chunks
+
+    merged: list[str] = []
+    buffer = ""
+
+    for chunk in chunks:
+        if len(chunk) >= min_len:
+            # 이 청크 자체가 이미 충분히 기니, 모아둔 짧은 버퍼를 먼저 정리하고
+            # 이 청크는 병합 대상으로 삼지 않는다 (자연스러운 섹션 경계를 침범하지 않도록).
+            if buffer:
+                merged.append(buffer)
+                buffer = ""
+            merged.append(chunk)
+            continue
+
+        buffer = f"{buffer}\n{chunk}" if buffer else chunk
+        if len(buffer) >= min_len:
+            merged.append(buffer)
+            buffer = ""
+
+    if buffer:
+        if merged:
+            merged[-1] = f"{merged[-1]}\n{buffer}"
+        else:
+            merged.append(buffer)
+
+    return merged
+
+
 def chunk_text(text: str, doc_type: str) -> list[str]:
     # 1순위: 제O조 형식 (law, terms 공통 - 카카오 이용약관 등)
     if doc_type in ("law", "terms"):
         chunks = split_by_pattern(text, ARTICLE_PATTERN)
         if chunks:
             print("[INFO] 조문(제O조) 단위 청킹")
-            return split_long_chunks(chunks)
+            return merge_short_chunks(split_long_chunks(chunks))
 
     # 2순위: 숫자 아웃라인 "1. Title" / "1.1. Title" (넷플릭스 영문 약관 등)
     if doc_type in ("law", "terms"):
         chunks = split_by_pattern(text, NUMBERED_OUTLINE_PATTERN)
         if chunks:
             print("[INFO] 숫자 아웃라인(1./1.1.) 단위 청킹")
-            return split_long_chunks(chunks)
+            return merge_short_chunks(split_long_chunks(chunks))
 
-    # 3순위: 소제목 기반 (유튜브 서비스 약관 등, 번호 체계 없음)
-    if doc_type in ("terms", "guideline"):
-        chunks = split_by_heading(text)
-        if chunks:
-            print("[INFO] 소제목 단위 청킹")
-            return split_long_chunks(chunks)
-
-    # 4순위: 행정지침 번호 목록
+    # 2.5순위: 행정지침의 "1. / 2. / 3." 번호 목록 (전자상거래 소비자보호 지침 등)
+    #   split_by_heading보다 먼저 시도해야 함 - is_heading_line은 20자 넘는 줄을
+    #   소제목으로 인정하지 않아서, 서술형으로 긴 번호 목록 제목을 놓치고
+    #   앞 섹션에 흡수시켜버리는 문제가 실제로 확인됨 (예: "전자상거래 등에서 소비자 보호 지침").
+    #   다만 "개인정보 처리방침 작성지침"류 문서는 "작성 예시" 안에서 1번부터 계속
+    #   다시 시작하는 짧은 목록이 반복되므로, merge_short_chunks로 초소형 조각을 방지한다.
     if doc_type == "guideline":
         chunks = split_by_pattern(text, GUIDELINE_PATTERN)
         if chunks:
             print("[INFO] 행정지침 문서: 번호 제목 단위 청킹")
-            return split_long_chunks(chunks)
+            return merge_short_chunks(split_long_chunks(chunks))
+
+    # 3순위: 소제목 기반 (유튜브 서비스 약관, 로마숫자 목차형 가이드라인 등 번호 체계 없는 경우)
+    if doc_type in ("terms", "guideline"):
+        chunks = split_by_heading(text)
+        if chunks:
+            print("[INFO] 소제목 단위 청킹")
+            return merge_short_chunks(split_long_chunks(chunks))
 
     print("[INFO] 일반 문서/약관: 글자 수 기반 청킹 (fallback)")
     docs = fallback_splitter.create_documents([text])
-    return [doc.page_content for doc in docs]
+    return merge_short_chunks([doc.page_content for doc in docs])
 
 
 def extract_article(chunk: str) -> str:
@@ -333,6 +391,7 @@ def upsert_chunks(
     chunks: list[str],
     source_kind: str = "file",
     doc_subtype: str = "unknown",
+    scope: str = "service_specific",
 ) -> None:
     delete_by_source(source_id)
 
@@ -354,6 +413,7 @@ def upsert_chunks(
                 "source": source_id,
                 "source_file": source_label,
                 "source_kind": source_kind,  # file / url / pasted
+                "scope": scope,  # service_specific / shared (여러 서비스 공통 문서, 예: 구글 통합 개인정보처리방침)
                 "chunk_index": index,
                 "article": extract_article(chunk),
                 "content_hash": hashlib.md5(chunk.encode("utf-8")).hexdigest(),
@@ -380,13 +440,17 @@ def ingest_text(
         return False
 
     text = clean_scraped_text(text)
+    scope = infer_scope(text)
+    if scope == "shared":
+        print(f"[WARNING] 여러 서비스 공통 적용 문서로 감지됨(scope=shared): {source_label}")
+
     chunks = chunk_text(text, doc_type)
 
     if not chunks:
         print(f"[SKIP] 청킹 결과 없음: {source_label}")
         return False
 
-    upsert_chunks(source_id, source_label, doc_type, service_name, chunks, source_kind, doc_subtype)
+    upsert_chunks(source_id, source_label, doc_type, service_name, chunks, source_kind, doc_subtype, scope)
     print(f"[DONE] {source_label} -> {len(chunks)} chunks")
     return True
 
@@ -505,7 +569,7 @@ def sweep_stale_sources(base_path: str = RAG_PATH) -> None:
         collection.delete(ids=ids_to_delete)
         print(f"[CLEANUP] 원본이 사라진(삭제/이름변경) 청크 {len(ids_to_delete)}개 정리")
     else:
-        print("[CLEANUP] 정리할 구버전 청크 없음")
+        print("[CLEANUP] 정리할 잔존 청크 없음")
 
 
 def ingest_all(base_path: str = RAG_PATH) -> None:
