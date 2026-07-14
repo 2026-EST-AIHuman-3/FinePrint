@@ -44,32 +44,39 @@ class FinalAnswerResult(BaseModel):
     )
 
     terms_evidence: list[str] = Field(
-        description=(
-            "제공된 약관 근거에 실제로 존재하는 내용만 "
-            "한국어로 작성한 목록"
-        )
+        description="제공된 약관 근거에 실제로 존재하는 내용만 작성"
     )
 
     simple_explanation: str = Field(
-        description="사용자 문제 상황을 쉬운 한국어로 설명"
+        description=(
+            "사용자 문제 상황을 쉬운 한국어로 설명. "
+            "근거 부족 답변에서는 현재 문서만으로 판단하기 어려운 이유를 명시"
+        )
     )
 
     check_items: list[str] = Field(
-        description="사용자가 추가로 확인해야 할 사항을 한국어로 작성"
+        description="추가 판단을 위해 사용자가 확인해야 할 사실 목록"
     )
 
     next_actions: list[str] = Field(
-        description="사용자가 취할 수 있는 행동을 한국어로 작성"
+        description=(
+            "근거 범위 안에서 사용자가 취할 수 있는 다음 행동. "
+            "근거 부족 시 사실 확인, 자료 확인, 공식 문의 범위로 제한"
+        )
     )
 
     required_materials: list[str] = Field(
-        description="준비하면 좋은 자료를 한국어로 작성"
+        description="사실관계 확인 또는 공식 문의 시 준비하면 좋은 자료"
     )
 
     inquiry_draft: str = Field(
-        description="자연스럽고 정중한 한국어 고객센터 문의문 초안"
+        description=(
+            "정중한 한국어 고객센터 문의문 초안. "
+            "근거 없는 권리 주장이나 환불 요구를 하지 않고 "
+            "사실관계와 처리 가능 여부를 확인하는 형태"
+        )
     )
 
     follow_up_questions: list[str] = Field(
-        description="추가 판단을 위해 사용자에게 물을 한국어 질문"
+        description="추가 판단을 위해 사용자에게 확인할 한국어 질문"
     )
