@@ -13,7 +13,8 @@ RAG에 자료를 넣어둔 후 py파일을 실행합니다.
 ## 사용 흐름
 RAG/ 폴더에 약관/법령 문서 추가 <br>
 　　　　　　　↓ <br>
-python ingest_rag.py (일괄 임베딩) 　,　 기존 source는 삭제 후 재삽입(upsert)  
+python ingest_rag.py  
+(같은 source는 기존 청크 삭제 후 재삽입)  
 　　　　　　　↓ <br>
 ChromaDB에 저장됨 (search_utils로 검색 가능)<br>
 
@@ -24,20 +25,22 @@ ChromaDB에 저장됨 (search_utils로 검색 가능)<br>
 ## RAG 폴더 구조
 
 RAG/  
-├── law/ # 법령 │  
-　├── 개인정보보호법.txt │  
-　└── 전자상거래법.txt │  
-├── guideline/ # 정부 소비자보호 지침 │  
-　└── 개인정보처리방침작성지침.txt │  
-├── terms/ # 서비스 약관 │  
-├── 넷플릭스/ │  
-├── 카카오/ │  
-├── 쿠팡/ │  
-├── 유튜브/ │  
-├── 티빙/ │  
-└── 한국소비자원/ │  
-　└── faq.json │
+├── law/ # 법령   
+　├── 개인정보보호법.txt   
+　└── 전자상거래법.txt   
+├── guideline/ # 정부 소비자보호 지침   
+　└── 개인정보처리방침작성지침.txt   
+├── terms/ # 서비스 약관   
+　├── 넷플릭스/   
+　├── 카카오/   
+　├── 쿠팡/   
+　├── 유튜브/   
+　├── 티빙/   
+　└── 한국소비자원/   
+　　└── faq.json 
 
+※ FAQ는 각 서비스 폴더에 자유롭게 둘 수 있습니다.  
+예) terms/넷플릭스/faq.json
 
 **파일명 규칙 - `doc_subtype` 자동 추론:**
 - `privacy`, `개인정보` 포함 → `privacy_policy`
@@ -190,7 +193,7 @@ DB 상태를 한눈에 확인:
 
 | 필드 | 값 예시 | 설명 |
 |---|---|---|
-| `type` | `law` / `guideline` / `terms` / 'faq' | 법령 / 소비자보호 지침 / 서비스 약관 / 질의응답 |
+| `type` | `law` / `guideline` / `terms` / `faq` | 법령 / 소비자보호 지침 / 서비스 약관 / 질의응답 |
 | `doc_subtype` | `terms_of_use` / `privacy_policy` / `refund_policy` / `payment_policy` / `unknown` | 문서 종류 |
 | `service_name` | `넷플릭스`, `쿠팡` 등 (law/guideline은 `none`) | 서비스명 |
 | `source` | 파일경로 / URL / `pasted::...` | 원본 식별자 |
@@ -199,8 +202,8 @@ DB 상태를 한눈에 확인:
 | `article` | `"1조"` 또는 `"unknown"` | 조문 번호 (제O조 형식 문서만) |
 | `chunk_index` | 정수 | 문서 내 청크 순서 |
 
-FAQ 문서 추가 필드
-type="faq" 문서일 때만 사용:
+### FAQ 문서 메타데이터
+`type="faq"`인 문서에서만 사용됩니다.
 
 |필드|	값 예시|	설명|
 |---|---|---|
