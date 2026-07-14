@@ -400,7 +400,7 @@ def make_chunk_id(source_id: str, index: int, chunk: str) -> str:
 def delete_by_source(source_id: str) -> None:
     """같은 소스(파일 경로 / URL / 직접입력 식별자)에 속한 기존 청크를 전부 삭제.
     내용이 조금이라도 바뀌면 청크 경계/개수/ID가 통째로 달라지므로,
-    upsert만으로는 구버전 청크가 고아로 남는 문제를 막는다."""
+    upsert만으로는 구버전 청크가 잔존하는 문제를 막는다."""
     existing = collection.get(where={"source": source_id})
     if existing["ids"]:
         collection.delete(ids=existing["ids"])
@@ -546,7 +546,11 @@ def iter_source_files(base_path: str = RAG_PATH) -> list[Path]:
         print(f"[ERROR] RAG 폴더가 없습니다: {base_path}")
         return []
 
-    files = list(base.rglob("*.txt")) + list(base.rglob("*.pdf"))
+    files = (
+        list(base.rglob("*.txt"))
+        + list(base.rglob("*.pdf"))
+        + list(base.rglob("*.json"))
+    )
     return sorted(files)
 
 
@@ -566,23 +570,28 @@ def ingest_file(path: Path) -> bool:
 
     text = load_file(path)
 
+    if text is None:
+        print(f"[ERROR] 파일 로드 실패: {path.name}")
+        return False
+
     return ingest_text(
         source_id=path.as_posix(),
         source_label=path.name,
         doc_type=doc_type,
         service_name=service_name,
-        text=text or "",
+        text=text,
         doc_subtype=doc_subtype,
     )
 
 
-def sweep_orphaned_sources(base_path: str = RAG_PATH) -> None:
+def sweep_stale_sources(base_path: str = RAG_PATH) -> None:
     """RAG 폴더에서 삭제되었거나 이름이 바뀐 '파일' 소스의 잔존 청크를 DB에서 정리.
     ingest_all() 전체 실행 후 1회 호출.
     URL/직접입력 소스(source_kind != "file")는 파일 시스템 스캔 대상이 아니므로 건드리지 않는다."""
     current_sources = {p.as_posix() for p in iter_source_files(base_path)}
-
-    existing = collection.get(where={"source_kind": "file"})
+    existing = collection.get(where={
+        "source_kind": "file"
+    })
     ids_to_delete = [
         chunk_id
         for chunk_id, meta in zip(existing["ids"], existing["metadatas"])
@@ -593,36 +602,223 @@ def sweep_orphaned_sources(base_path: str = RAG_PATH) -> None:
         collection.delete(ids=ids_to_delete)
         print(f"[CLEANUP] 원본이 사라진(삭제/이름변경) 청크 {len(ids_to_delete)}개 정리")
     else:
-        print("[CLEANUP] 정리할 고아 청크 없음")
+        print("[CLEANUP] 정리할 잔존 청크 없음")
+
+# ===== FAQ 전용 로딩 및 처리 =====
+
+def load_faq_json(path: Path) -> list[dict] | None:
+    """
+    FAQ JSON 파일 로드.
+    
+    기대 형식:
+    [
+        {
+            "question": "미성년자가 피해를 입었을 때 어떻게 되나요?",
+            "answer": "미성년자는 법정대리인(보호자)이 대신...",
+            "category": "refund_policy",  (선택, 없으면 "unknown")
+            "keywords": ["미성년자", "피해"]  (선택)
+        },
+        ...
+    ]
+    
+    반환: list[dict] (성공) / None (실패)
+    """
+    try:
+        import json
+        text = path.read_text(encoding="utf-8")
+        data = json.loads(text)
+        
+        if not isinstance(data, list):
+            print(f"[ERROR] FAQ JSON은 배열 형식이어야 합니다: {path.name}")
+            return None
+        
+        # 기본 유효성 검사
+        for i, item in enumerate(data):
+            if not isinstance(item, dict):
+                print(f"[ERROR] FAQ 항목 {i}가 dict가 아닙니다: {path.name}")
+                return None
+            if "question" not in item or "answer" not in item:
+                print(
+                    f"[ERROR] FAQ 항목 {i}에 'question' 또는 'answer' 필드가 없습니다: {path.name}"
+                )
+                return None
+        
+        return data
+    
+    except json.JSONDecodeError as e:
+        print(f"[ERROR] FAQ JSON 파싱 실패: {path.name} / {e}")
+        return None
+    except Exception as e:
+        print(f"[ERROR] FAQ 파일 로드 실패: {path.name} / {e}")
+        return None
+
+
+def infer_faq_doc_subtype(item: dict) -> str:
+    """
+    FAQ 항목에서 doc_subtype 추론.
+    
+    우선순위:
+    1. item["category"] 직접 지정 (있으면)
+    2. question/answer 텍스트에서 키워드 추론 (없으면)
+    """
+    # 1순위: 직접 지정
+    if "category" in item and item["category"]:
+        return item["category"]
+    
+    # 2순위: 키워드 기반 추론
+    combined_text = f"{item.get('question', '')} {item.get('answer', '')}".lower()
+    
+    for subtype, keywords in DOC_SUBTYPE_KEYWORDS.items():
+        if any(keyword.lower() in combined_text for keyword in keywords):
+            return subtype
+    
+    return "unknown"
+
+
+def make_faq_document(question: str, answer: str) -> str:
+    """
+    FAQ 질문+답변을 하나의 임베딩 대상 텍스트로 조합.
+    
+    형식:
+    Q: {question}
+    
+    A: {answer}
+    """
+    return f"Q: {question.strip()}\n\nA: {answer.strip()}"
+
+
+def upsert_faq_items(
+    source_id: str,
+    source_label: str,
+    service_name: str,
+    faq_items: list[dict],
+) -> None:
+    """
+    FAQ 항목들을 ChromaDB에 upsert.
+    
+    각 FAQ 항목을 별도 청크로 저장 (이미 완벽하게 구분되어 있으므로 재청킹 X).
+    """
+    delete_by_source(source_id)
+    
+    if not faq_items:
+        return
+    
+    ids = []
+    documents = []
+    metadatas = []
+    
+    for index, item in enumerate(faq_items):
+        question = item.get("question", "").strip()
+        answer = item.get("answer", "").strip()
+        
+        if not question or not answer:
+            print(f"[SKIP] FAQ 항목 {index}: 질문 또는 답변이 비어있음")
+            continue
+        
+        # 임베딩 대상: 질문 + 답변 조합
+        document = make_faq_document(question, answer)
+        
+        # doc_subtype 추론
+        doc_subtype = infer_faq_doc_subtype(item)
+        
+        # 청크 ID: source + index + 질문 처음 50자
+        chunk_id = make_chunk_id(source_id, index, document)
+        
+        ids.append(chunk_id)
+        documents.append(document)
+        metadatas.append(
+            {
+                "type": "faq",
+                "doc_subtype": doc_subtype,
+                "service_name": service_name,
+                "source": source_id,
+                "source_file": source_label,
+                "source_kind": "file",  
+                "scope": "service_specific",
+                "chunk_index": index,
+                "article": "unknown",
+                # ✅ FAQ 전용 메타데이터
+                "question": question,  # 질문 원문 (인용용)
+                "answer": answer,      # 답변 원문 (인용용)
+                "content_hash": hashlib.md5(document.encode("utf-8")).hexdigest(),
+            }
+        )
+    
+    if ids:
+        collection.upsert(ids=ids, documents=documents, metadatas=metadatas)
+        print(f"[DONE] {source_label} -> {len(ids)} FAQ items")
+
+
+def ingest_faq_file(path: Path) -> bool:
+    """
+    FAQ JSON 파일을 DB에 임베딩.
+    
+    자동 추론:
+    - service_name: 파일명 또는 폴더 구조에서 추론 (있으면)
+    - doc_subtype: 각 항목의 category 필드 또는 텍스트 키워드 기반
+    """
+    faq_items = load_faq_json(path)
+    
+    if faq_items is None:
+        return False
+    
+    # service_name 추론 (같은 로직 재사용 가능)
+    service_name = infer_service_name(path, "terms")  # terms 로직으로 폴더 구조 파싱
+    if service_name == "unknown":
+        # 폴더 구조 없으면 파일명 기반
+        service_name = path.stem
+    
+    print(f"[LOAD] {path}")
+    print(f"[META] type=faq, service_name={service_name}, items={len(faq_items)}")
+    
+    upsert_faq_items(
+        source_id=path.as_posix(),
+        source_label=path.name,
+        service_name=service_name,
+        faq_items=faq_items,
+    )
+    
+    return True
 
 
 def ingest_all(base_path: str = RAG_PATH) -> None:
-    files = iter_source_files(base_path)
+    """
+    RAG 폴더의 모든 파일(일반 문서 + FAQ JSON) 일괄 임베딩.
+    """
+    all_files = iter_source_files(base_path)
 
-    if not files:
+    if not all_files:
         print(f"[WARNING] 처리할 파일이 없습니다: {base_path}")
         return
-
+    
     success_count = 0
     fail_count = 0
-
-    for path in files:
+    
+    for path in all_files:
         try:
-            if ingest_file(path):
-                success_count += 1
+            if path.suffix.lower() == ".json":
+                # FAQ 파일 처리
+                if ingest_faq_file(path):
+                    success_count += 1
+                else:
+                    fail_count += 1
             else:
-                fail_count += 1
-
+                # 기존 문서 파일 처리
+                if ingest_file(path):
+                    success_count += 1
+                else:
+                    fail_count += 1
+        
         except Exception as exc:
             print(f"[ERROR] 처리 실패: {path} / {exc}")
             fail_count += 1
-
-    sweep_orphaned_sources(base_path)
-
+    
+    sweep_stale_sources(base_path)  # 삭제된 파일 정리 (파일/JSON 모두)
+    
     print()
     print(f"[SUMMARY] 성공: {success_count}")
     print(f"[SUMMARY] 실패: {fail_count}")
-    print(f"[SUMMARY] 전체 파일: {len(files)}")
+    print(f"[SUMMARY] 전체 파일: {len(all_files)}")
     print(f"[SUMMARY] DB 전체 청크 수: {collection.count()}")
 
 
