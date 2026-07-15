@@ -61,17 +61,41 @@ def extract_keywords_in_query(query: str) -> list[str]:
     ]
 
 
-def build_where_filter(doc_type: str | list[str] | None = None) -> dict | None:
-    if doc_type is None:
+def build_where_filter(
+        doc_type: str | list[str] | None = None,
+        service_name: str | None = None,) -> dict | None:
+
+    # if doc_type is None:
+    #     return None
+
+    # if isinstance(doc_type, str):
+    #     return {"type": doc_type}
+
+    # if len(doc_type) == 1:
+    #     return {"type": doc_type[0]}
+
+    # return {"type": {"$in": doc_type}}
+
+    conditions = []
+
+    if doc_type is not None:
+        if isinstance(doc_type, str):
+            conditions.append({"type": doc_type})
+        elif len(doc_type) == 1:
+            conditions.append({"type": doc_type[0]})
+        else:
+            conditions.append({"type": {"$in": doc_type}})
+
+    if service_name:
+        conditions.append({"service_name": service_name})
+
+    if not conditions:
         return None
 
-    if isinstance(doc_type, str):
-        return {"type": doc_type}
+    if len(conditions) == 1:
+        return conditions[0]
 
-    if len(doc_type) == 1:
-        return {"type": doc_type[0]}
-
-    return {"type": {"$in": doc_type}}
+    return {"$and": conditions}
 
 
 def hybrid_search(
@@ -79,6 +103,7 @@ def hybrid_search(
     n_results: int = 3,
     candidate_pool: int = 15,
     doc_type: str | list[str] | None = None,
+    service_name: str | None = None,
 ) -> list[dict]:
     count = collection.count()
     if count == 0:
@@ -86,7 +111,11 @@ def hybrid_search(
         return []
 
     keywords = extract_keywords_in_query(query)
-    where = build_where_filter(doc_type)
+    # where = build_where_filter(doc_type)
+    where = build_where_filter(
+    doc_type=doc_type,
+    service_name=service_name,
+    )
 
     query_kwargs = {
         "query_texts": [query],
@@ -143,6 +172,7 @@ def print_results(results: list[dict], preview_chars: int = 250) -> None:
         print(f"\n[{index}]")
         print("TEXT:", result["text"][:preview_chars])
         print("TYPE:", metadata.get("type"))
+        print("SERVICE:", metadata.get("service_name"))
         print("ARTICLE:", metadata.get("article", "unknown"))
         print("SOURCE:", metadata.get("source"))
         print(
@@ -153,13 +183,28 @@ def print_results(results: list[dict], preview_chars: int = 250) -> None:
 
 
 if __name__ == "__main__":
-    sample_queries = [
-        "제3자에게 개인정보를 제공하나요?",
-        "디지털콘텐츠도 청약철회가 되나요?",
-    ]
+    # sample_queries = [
+    #     "제3자에게 개인정보를 제공하나요?",
+    #     "디지털콘텐츠도 청약철회가 되나요?",
+    # ]
 
-    for sample_query in sample_queries:
-        print("\n======================")
-        print(f"QUERY: {sample_query}")
-        print("======================")
-        print_results(search_law_and_guideline(sample_query))
+    # for sample_query in sample_queries:
+    #     print("\n======================")
+    #     print(f"QUERY: {sample_query}")
+    #     print("======================")
+    #     print_results(search_law_and_guideline(sample_query))
+
+    terms_query = "넷플릭스 해지 후 추가 결제 환불"
+
+    print("\n======================")
+    print(f"TERMS QUERY: {terms_query}")
+    print("======================")
+
+    print_results(
+        hybrid_search(
+            query=terms_query,
+            n_results=5,
+            doc_type="terms",
+            service_name="넷플릭스",
+        )
+    )
