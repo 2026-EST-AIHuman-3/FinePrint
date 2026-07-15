@@ -7,40 +7,42 @@ RAG에 자료를 넣어둔 후 py파일을 실행합니다.
 ## 구조
 
 - **`ingest_rag.py`**: 문서 로딩, 청킹, 임베딩, ChromaDB 저장 담당
-- **`search_utils.py`**: 하이브리드 검색(의미 기반 + 키워드 가중치) 담당 
+- **`search_utils.py`**: 하이브리드 검색(의미 기반 + 키워드 가중치) 담당
 - **`config.py`**: 공유 설정 (DB 경로, 임베딩 모델 등)
 
 ## 사용 흐름
 RAG/ 폴더에 약관/법령 문서 추가 <br>
 　　　　　　　↓ <br>
-python ingest_rag.py  
+python ingest_rag.py
 (같은 source는 기존 청크 삭제 후 재삽입)  
 　　　　　　　↓ <br>
 ChromaDB에 저장됨 (search_utils로 검색 가능)<br>
 
-
+※ `ingest_all()` 실행이 끝나면, RAG 폴더에서 삭제되거나 이름이 바뀐 파일의 잔존 청크도 자동으로 정리됩니다 (`sweep_stale_sources`).
 
 ---
 
 ## RAG 폴더 구조
 
 RAG/  
-├── law/ # 법령   
-　├── 개인정보보호법.txt   
-　└── 전자상거래법.txt   
-├── guideline/ # 정부 소비자보호 지침   
-　└── 개인정보처리방침작성지침.txt   
-├── terms/ # 서비스 약관   
-　├── 넷플릭스/   
-　├── 카카오/   
-　├── 쿠팡/   
-　├── 유튜브/   
-　├── 티빙/   
-　└── 한국소비자원/   
-　　└── faq.json 
+├── law/ # 법령  
+　├── 개인정보보호법.txt  
+　└── 전자상거래법.txt  
+├── guideline/ # 정부 소비자보호 지침  
+　└── 개인정보처리방침작성지침.txt  
+├── terms/ # 서비스 약관  
+　├── 넷플릭스/  
+　├── 카카오/  
+　├── 쿠팡/  
+　├── 유튜브/  
+　├── 티빙/  
+　└── 한국소비자원/  
+　　└── faq.json
 
-※ FAQ는 각 서비스 폴더에 자유롭게 둘 수 있습니다.  
+※ FAQ는 각 서비스 폴더에 자유롭게 둘 수 있습니다.
 예) terms/넷플릭스/faq.json
+
+※ `service_name`은 구독 서비스명(넷플릭스/카카오/쿠팡/유튜브/티빙) 외에, FAQ 등 일반 참고자료의 출처(예: `한국소비자원`)도 포함할 수 있습니다. 검색 필터를 "5개 구독 서비스 중 하나"로만 가정하고 짜지 않도록 주의하세요.
 
 **파일명 규칙 - `doc_subtype` 자동 추론:**
 - `privacy`, `개인정보` 포함 → `privacy_policy`
@@ -49,11 +51,13 @@ RAG/
 - `terms`, `이용약관`, `서비스약관` 포함 → `terms_of_use`
 - 매칭 안 됨 → `unknown`
 
+FAQ(`.json`)의 경우, 항목별 `category` 필드가 위 4개 값과 정확히 일치할 때만 그대로 사용하고, 그 외(예: `"FAQ"` 같은 일반 라벨)에는 질문+답변 텍스트에서 같은 키워드로 재추론합니다.
+
 ---
 
 ## 청킹 전략 (자동 선택)
 
-문서 타입에 따라 **우선순위 기반 청킹**이 자동으로 적용됩니다:
+문서 타입에 따라 **우선순위 기반 청킹**이 자동으로 적용됩니다 (`.txt`, `.pdf` 대상):
 
 | 우선순위 | 형식 | 예시 | 대상 |
 |---------|------|------|------|
@@ -63,7 +67,9 @@ RAG/
 | 4순위 | 소제목 기반 | `[소제목]` | terms, guideline |
 | 5순위 | 글자 수 기반 (fallback) | 1000자 단위 분할 | 모든 문서 |
 
-**청킹 후 처리:**
+**⚠️ JSON(FAQ) 파일은 이 청킹 전략을 거치지 않습니다.** 배열의 각 항목이 이미 완결된 Q&A 단위이므로, 항목 하나 = 청크 하나로 그대로 저장됩니다 (`제O조`/소제목 분리 로직 미적용).
+
+**청킹 후 처리 (txt/pdf만 해당):**
 - `split_long_chunks()`: 1500자 초과 청크 재분할
 - `merge_short_chunks()`: 120자 미만 청크 통합 (초소형 조각 방지)
 
@@ -82,7 +88,6 @@ from config import DB_PATH, COLLECTION_NAME, EMBEDDING_MODEL
 DB 접속/검색 코드에서 위 3개 값을 직접 하드코딩하지 말고 **반드시 `config.py`에서 import**해서 쓰세요. <br>
 임베딩 모델이 인제스트 때와 검색 때가 다르면 벡터 공간이 어긋나서 검색이 전부 이상하게 나옵니다.
 
-
 ```python
 import chromadb
 from chromadb.utils import embedding_functions
@@ -96,6 +101,7 @@ collection = client.get_collection(
     ),
 )
 ```
+
 ---
 
 ## 사용 가능한 함수
@@ -138,6 +144,7 @@ ingest_from_url(
 * **⚠️ 이 두 파라미터는 값 검증이 있습니다:**
   * `service_name`이 빈 문자열이면 `ValueError` 발생
   * `doc_type`이 `{"law", "guideline", "terms"}` 중 하나가 아니면 `ValueError` 발생 (오타/대소문자 주의 — `"Terms"`, `"term"` 다 에러남)
+  * **`doc_type="faq"`는 이 함수로 만들 수 없습니다** — `faq` 타입은 `RAG/.../*.json` 파일을 통한 일괄 인제스트(`ingest_all()`)로만 생성됩니다.
 * 이미 같은 `url`로 저장된 게 있으면, 호출 시 **기존 청크를 지우고 새로 저장**합니다 (중복 안 쌓임 — 재크롤링해서 다시 넣어도 안전).
 
 ```python
@@ -163,7 +170,7 @@ ingest_from_pasted_text(
 ```
 
 * URL에서 약관 추출 실패 시, 사용자가 직접 붙여넣은 텍스트를 DB에 저장
-* 반환값/검증 규칙은 `ingest_from_url`과 동일
+* 반환값/검증 규칙(`doc_type="faq"` 불가 포함)은 `ingest_from_url`과 동일
 
 ```python
 ingest_from_pasted_text(
@@ -172,11 +179,17 @@ ingest_from_pasted_text(
     doc_subtype="refund_policy",
 )
 ```
-### 4. check_db_status.py
 
-```
+---
+
+## DB 상태 확인
+
+`import`해서 쓰는 함수가 아니라 **터미널에서 직접 실행하는 스크립트**입니다.
+
+```bash
 python check_db_status.py
 ```
+
 DB 상태를 한눈에 확인:
 
 - 전체 청크 수
@@ -187,6 +200,8 @@ DB 상태를 한눈에 확인:
 - scope별 청크 수 (service_specific/shared)
 - 구버전 스키마 잔존 여부 체크 ⚠️
 
+---
+
 ## 검색 시 참고할 메타데이터 필드
 
 저장된 모든 청크에는 아래 메타데이터가 붙어있어서, `collection.get()`/`collection.query()`의 `where` 필터로 활용 가능합니다.
@@ -195,7 +210,7 @@ DB 상태를 한눈에 확인:
 |---|---|---|
 | `type` | `law` / `guideline` / `terms` / `faq` | 법령 / 소비자보호 지침 / 서비스 약관 / 질의응답 |
 | `doc_subtype` | `terms_of_use` / `privacy_policy` / `refund_policy` / `payment_policy` / `unknown` | 문서 종류 |
-| `service_name` | `넷플릭스`, `쿠팡` 등 (law/guideline은 `none`) | 서비스명 |
+| `service_name` | `넷플릭스`, `쿠팡` 등 (law/guideline은 `none`, FAQ는 출처명) | 서비스명 또는 자료 출처명 |
 | `source` | 파일경로 / URL / `pasted::...` | 원본 식별자 |
 | `source_kind` | `file` / `url` / `pasted` | 어떤 경로로 들어왔는지 |
 | `scope` | `service_specific` / `shared` | ⚠️ 아래 참고 |
@@ -205,19 +220,16 @@ DB 상태를 한눈에 확인:
 ### FAQ 문서 메타데이터
 `type="faq"`인 문서에서만 사용됩니다.
 
-|필드|	값 예시|	설명|
+| 필드 | 값 예시 | 설명 |
 |---|---|---|
-|question|	"미성년자 피해 시 어떻게 되나요?"|	질문 원문 (인용용)|
-|answer|	"법정대리인이 대신 신청 가능합니다."|	답변 원문 (인용용)|
+| `question` | `"미성년자 피해 시 어떻게 되나요?"` | 질문 원문 (인용용) |
+| `answer` | `"법정대리인이 대신 신청 가능합니다."` | 답변 원문 (인용용) |
 
-
-**⚠️ `scope="shared"` 주의사항**: 유튜브 개인정보처리방침처럼 "구글 전체 서비스에 공통 적용"되는 문서는 자동으로 `scope="shared"`가 붙습니다.  
-이런 문서는 유튜브와 무관한 내용(Gmail, 검색 등)이 섞여 있을 수 있으니, 검색 결과에 이 필드가 `shared`로 나오면 답변 생성 시  
+**⚠️ `scope="shared"` 주의사항**: 유튜브 개인정보처리방침처럼 "구글 전체 서비스에 공통 적용"되는 문서는 자동으로 `scope="shared"`가 붙습니다.
+이런 문서는 유튜브와 무관한 내용(Gmail, 검색 등)이 섞여 있을 수 있으니, 검색 결과에 이 필드가 `shared`로 나오면 답변 생성 시
 "이 조항은 구글 서비스 전반에 적용되는 내용"이라는 걸 참고해서 처리해주세요.
 
 ```python
 # 필터링 예시
 collection.get(where={"$and": [{"service_name": "넷플릭스"}, {"type": "terms"}]})
 ```
-
-
