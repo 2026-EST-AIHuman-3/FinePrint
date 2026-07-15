@@ -12,9 +12,10 @@ import chromadb
 from chromadb.utils import embedding_functions
 
 
-DB_PATH = "./db"
-COLLECTION_NAME = "RAG_system"
-EMBEDDING_MODEL = "paraphrase-multilingual-mpnet-base-v2"
+try:
+    from .config import DB_PATH, COLLECTION_NAME, EMBEDDING_MODEL
+except ImportError:
+    from config import DB_PATH, COLLECTION_NAME, EMBEDDING_MODEL
 
 DOMAIN_KEYWORDS = [
     "청약철회",
