@@ -653,25 +653,21 @@ def load_faq_json(path: Path) -> list[dict] | None:
         return None
 
 
+
 def infer_faq_doc_subtype(item: dict) -> str:
-    """
-    FAQ 항목에서 doc_subtype 추론.
-    
-    우선순위:
-    1. item["category"] 직접 지정 (있으면)
-    2. question/answer 텍스트에서 키워드 추론 (없으면)
-    """
-    # 1순위: 직접 지정
-    if "category" in item and item["category"]:
-        return item["category"]
-    
-    # 2순위: 키워드 기반 추론
+    """FAQ 항목의 doc_subtype 추론.
+    item["category"]가 우리가 이미 정의한 doc_subtype 값(예: refund_policy)과
+    정확히 일치할 때만 그대로 사용한다. "FAQ"처럼 일반적인 라벨이면
+    (실제 kca_faq.json이 그렇듯) 무시하고 질문+답변 텍스트 키워드로 추론한다."""
+    category = item.get("category")
+    if category in DOC_SUBTYPE_KEYWORDS:
+        return category
+
     combined_text = f"{item.get('question', '')} {item.get('answer', '')}".lower()
-    
     for subtype, keywords in DOC_SUBTYPE_KEYWORDS.items():
         if any(keyword.lower() in combined_text for keyword in keywords):
             return subtype
-    
+
     return "unknown"
 
 
