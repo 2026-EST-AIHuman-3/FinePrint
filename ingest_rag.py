@@ -393,9 +393,10 @@ def extract_article(chunk: str) -> str:
 
 
 def make_chunk_id(source_id: str, index: int, chunk: str) -> str:
-    raw = f"{source_id}::{index}::{chunk[:80]}"
+    # chunk 전체 내용에 대한 해시를 포함해 id 충돌 가능성 최소화
+    content_hash = hashlib.sha1(chunk.encode("utf-8")).hexdigest()
+    raw = f"{source_id}::{index}::{content_hash}"
     return hashlib.sha1(raw.encode("utf-8")).hexdigest()
-
 
 def delete_by_source(source_id: str) -> None:
     """같은 소스(파일 경로 / URL / 직접입력 식별자)에 속한 기존 청크를 전부 삭제.
