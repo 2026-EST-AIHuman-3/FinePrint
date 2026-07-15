@@ -2,6 +2,7 @@ from dotenv import load_dotenv
 from agent.state import FinePrintState
 from agent.schemas import IntentResult, VerificationResult, ImprovementResult, FinalAnswerResult
 from langchain.chat_models import init_chat_model
+from rag_adapter import retrieve_rag_context
 
 load_dotenv()
 
@@ -92,59 +93,89 @@ def classify_intent(state: FinePrintState):
 
 # Hybrid RAG 검색
 def retrieve_context(state: FinePrintState):
-    # fail 경로 검증 임시 값!!
-    # return {
-    #     "terms_context": [
-    #         "해지 시 현재 결제 주기 종료일까지 서비스를 이용할 수 있습니다."
-    #     ],
-    #     "consumer_protection_context": [
-    #         "계속거래 계약 관련 소비자 보호 기준입니다."
-    #     ],
-    # }
-
-    # pass 경로 검증 임시 값!!!
-     return {
-        "terms_context": [
-            (
-                "회원은 다음 결제일 이전까지 멤버십을 해지할 수 있으며, "
-                "해지 후에는 다음 결제 주기부터 요금이 청구되지 않습니다."
-            ),
-            (
-                "해지 완료 이후 시스템 오류로 추가 결제가 발생한 경우, "
-                "결제 내역 확인 후 해당 금액의 환불을 요청할 수 있습니다."
-            ),
-        ],
-        "consumer_protection_context": [
-            "소비자는 계속거래 계약의 해지를 요청할 수 있습니다."
-        ],
-    }
+    return retrieve_rag_context(
+        service_name=state["service_name"],
+        user_question=state["user_question"],
+        improvement_instruction=state.get(
+            "improvement_instruction",
+            "",
+        ),
+    )
 
 # 쉬운 말 / 답변 생성
-def generate_answer(state: FinePrintState):
-    # 근거 없는 임시 답변!!
-    # return {
-    #     "draft_answer": (
-    #         "해지 이후 결제된 금액은 무조건 전액 환불받을 수 있습니다."
-    #     )
-    # }
+def generate_answer(state: FinePrintState):  
+    service_name = state["service_name"]
+    user_question = state["user_question"]
+    primary_intent = state["primary_intent"]
 
-    # 근거에 따른 임시 답변!!!
+    terms_context = state["terms_context"]
+    consumer_context = state["consumer_protection_context"]
+
+    improvement_instruction = state.get(
+        "improvement_instruction",
+        ""
+    )
+
+    prompt = f"""
+    당신은 FinePrint의 1차 답변 생성 Agent입니다.
+
+    [서비스명]
+    {service_name}
+
+    [사용자 질문]
+    {user_question}
+
+    [주요 문제 유형]
+    {primary_intent}
+
+    [관련 약관 근거]
+    {terms_context}
+
+    [소비자 보호 근거]
+    {consumer_context}
+
+    [이전 검증 결과에 따른 개선 지시]
+    {improvement_instruction}
+
+    제공된 근거만 사용해 사용자 질문에 직접 답하세요.
+
+    다음 원칙을 지키세요.
+
+    1. 모든 답변은 한국어로 작성하세요.
+    2. 약관 근거와 소비자 보호 근거를 구분해서 설명하세요.
+    3. 제공된 근거에 없는 사실을 추측하지 마세요.
+    4. 환불 가능 여부 등을 근거 없이 확정하지 마세요.
+    5. 근거가 부족한 부분은 추가 확인이 필요하다고 표현하세요.
+    6. 개선 지시가 있다면 반드시 반영하세요.
+    7. 개선 지시가 없다면 최초 답변을 생성하세요.
+
+    근거를 요약할 때 원문의 의미를 확대하거나 바꾸지 마세요.
+    특히 "다른 등록 결제 수단으로 청구할 수 있음"을 "결제 수단을 자동으로 갱신함"으로 표현하지 마세요.
+    """
+
+    response = generation_llm.invoke(prompt)
+
     return {
-        "draft_answer": (
-            "확인된 약관에 따르면 해지 후에는 다음 결제 주기부터 "
-            "요금이 청구되지 않습니다. 또한 해지 완료 이후 시스템 오류로 "
-            "추가 결제가 발생한 경우 결제 내역 확인 후 환불을 요청할 수 있습니다."
-        )
+        "draft_answer": response.content
     }
 
 # 근거 검증 Agent
 def verify_answer(state: FinePrintState):
+    user_question = state["user_question"]
+    primary_intent = state["primary_intent"]
+
     terms_context = state["terms_context"]
     consumer_context = state["consumer_protection_context"]
     draft_answer = state["draft_answer"]
 
     prompt = f"""
     당신은 FinePrint의 근거 검증 Agent입니다.
+
+    [사용자 질문]
+    {user_question}
+
+    [주요 문제 유형]
+    {primary_intent}
 
     [약관 근거]
     {terms_context}
@@ -164,6 +195,16 @@ def verify_answer(state: FinePrintState):
     2. 환불 가능, 위법, 보상 가능 등 확정적인 표현에 직접 근거가 있는가
     3. 사용자에게 제안한 다음 행동이 근거와 모순되지 않는가
     4. 답변에 필요한 핵심 근거가 누락되어 있는가
+    5. 검색된 근거가 사용자의 실제 질문과 직접 관련되어 있는가
+    6. 생성된 답변이 사용자의 질문과 주요 문제 유형에 직접 답하고 있는가
+    7. 답변과 근거가 서로 일치하더라도, 사용자의 질문과 무관한 내용이면 FAIL로 판단하세요.
+    8. 소비자 보호 기준이 해당 서비스 유형 또는 업종에 실제로 적용되는지 확인하세요.
+       검색 청크에 적용 대상이나 업종 정보가 없으면 일반적으로 적용 가능한 기준이라고 단정하지 마세요.
+    
+    reason과 missing_evidence는 반드시 한국어로 작성하세요.
+       
+    예를 들어, 사용자 질문이 계정 정지 사유에 관한 것인데
+    검색 근거와 생성 답변이 해지, 결제, 환불만 다룬다면 FAIL입니다.
 
     충분한 근거가 있다면 PASS,
     근거 부족 또는 근거 밖 추측이 있다면 FAIL로 판단하세요.
@@ -171,6 +212,21 @@ def verify_answer(state: FinePrintState):
     FAIL인 경우 부족한 근거를 missing_evidence에 작성하고,
     추가 문서 검색이 필요하면 RETRIEVE_AGAIN,
     근거는 충분하지만 답변 표현 수정이 필요하면 REGENERATE를 선택하세요.
+
+    사용자의 사실관계가 아직 확인되지 않았더라도,
+    제공된 근거에 명확한 조건부 기준이 있고
+    답변이 그 조건을 그대로 설명하면서 추가 확인이 필요하다고 안내한다면
+    근거 부족만을 이유로 FAIL로 판단하지 마세요.
+
+    예:
+    "결제일로부터 7일 이내이고 콘텐츠를 이용하지 않았다면 환불을 요청할 수 있습니다.
+    실제 해당 여부는 결제일, 해지 시점, 이용 여부 확인이 필요합니다."
+
+    위와 같은 조건부 안내는 PASS로 판단할 수 있습니다.
+
+    답변이 환불을 확정하지 않고,
+    근거에 제시된 조건과 확인해야 할 사실을 정확히 구분했다면
+    직접 적용 사례가 없다는 이유만으로 FAIL로 판단하지 마세요.
     """
 
     result = verification_llm.invoke(prompt)
@@ -220,12 +276,20 @@ def improve_strategy(state: FinePrintState):
 
     새로운 사실을 추측하거나 답변을 직접 생성하지 마세요.
 
+    검증 Agent의 suggested_action에 해당하는 개선 지시만 작성하세요.
+
+    제목이나 RETRIEVE_AGAIN, REGENERATE 같은 분류명을 출력하지 말고,
+    실제로 다음 단계에서 수행할 구체적인 지시만 작성하세요.
+
     RETRIEVE_AGAIN인 경우:
     추가로 찾아야 할 정보와 검색 방향을 구체적으로 작성하세요.
 
     REGENERATE인 경우:
     기존 근거 범위 안에서 수정해야 할 답변 표현,
     출력 방식 또는 주의사항을 구체적으로 작성하세요.
+
+    검색 방향은 공식 약관, 공식 정책, 법령, 정부·공공기관 지침으로 제한하세요.
+    커뮤니티 게시글, 리뷰, 사용자 경험 사례는 검색 근거로 제안하지 마세요.
     """
 
     result = improvement_llm.invoke(prompt)
@@ -299,8 +363,41 @@ def generate_final_answer(state: FinePrintState):
     6. 사용자가 실제로 확인하고 행동할 수 있도록 구체적으로 안내하세요.
     7. 근거가 부족한 부분은 추가 확인이 필요하다고 명확히 표현하세요.
     8. 문의문 초안은 사용자 상황에 맞게 자연스럽고 정중한 한국어로 작성하세요.
-    9. 문의문 초안은 반드시 사용자가 서비스 고객센터에 직접 문의하는 1인칭 관점으로 작성하세요. 
+    9. 문의문 초안은 반드시 사용자가 서비스 고객센터에 직접 문의하는 1인칭 관점으로 작성하세요.
        고객센터가 사용자에게 답변하는 형태로 작성하지 마세요.
+
+    10. 사용자가 제공하지 않은 사실은 절대 확정하거나 추정하지 마세요.
+        특히 다음 정보가 확인되지 않았다면 사실처럼 작성하지 마세요.
+        - 해지 완료 여부
+        - 해지 날짜와 처리 시점
+        - 결제 날짜와 결제 원인
+        - 콘텐츠 이용 여부
+        - 환불 조건 충족 여부
+
+    11. 사용자 질문에 포함된 표현도 확인된 사실이 아니라
+        사용자의 주장으로만 취급하세요.
+        예를 들어 "해지했는데 결제됐다"는 표현만으로
+        해지가 정상 완료되었다고 판단하지 마세요.
+
+    12. 확인되지 않은 정보는 반드시 다음 중 하나의 방식으로 작성하세요.
+        - 대괄호 자리표시자 사용
+        - 고객센터에 확인 요청
+        - 사용자가 직접 입력할 항목으로 제시
+
+    13. 문의문에 환불 조건이 포함되더라도,
+        사용자가 그 조건을 충족했다고 단정하지 마세요.
+
+    잘못된 예:
+    "구독 취소 후 넷플릭스 콘텐츠에 접근하지 않았습니다."
+
+    올바른 예:
+    "구독 취소 후 콘텐츠 이용 여부는 [이용 여부 입력]입니다."
+
+    또는:
+    "구독 취소 후 콘텐츠 이용 기록도 함께 확인 부탁드립니다."
+
+    14. required_materials에는 사용자가 실제로 준비할 수 있는 자료만 포함하세요.
+        법령, 소비자 보호 기준, 내부 정책 문서는 포함하지 마세요.
 
     검증 상태가 FAIL인 경우,
     확인되지 않은 내용을 사실처럼 작성하지 마세요.
@@ -377,6 +474,7 @@ def generate_insufficient_evidence_answer(
     8. 근거가 없는 환불 요청, 결제 취소, 신고, 이의 제기 등의 행동을 직접 권고하지 마세요.
     9. 문의문 초안은 특정 권리를 주장하거나 환불을 요구하는 내용이 아니라, 문제 상황과 사실관계를 설명하고 관련 정책 및 처리 가능 여부를 확인하는 형태로 작성하세요.
     10. 현재 확보된 문서만으로 충분한 근거를 확인하기 어렵다는 점을 명확히 안내하세요.
+    11. 사용자가 제공하지 않은 사실관계를 확정하지 말고, 확인되지 않은 정보는 추가 확인이 필요한 항목으로 표현하세요.
     """
 
     result = final_answer_llm.invoke(prompt)

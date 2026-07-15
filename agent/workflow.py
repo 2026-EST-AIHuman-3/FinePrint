@@ -12,7 +12,16 @@ from agent.nodes import (
     generate_out_of_scope_answer
 )
 
-# 분기 함수!
+# 분기 함수 - 답변 재생성인지 근거 재검색인지 여부
+def route_improvement(state: FinePrintState):
+    action = state["suggested_action"]
+
+    if action == "REGENERATE":
+        return "regenerate"
+
+    return "retrieve_again"
+
+# 분기 함수! - out-of-scope 인지 아닌지 여부
 def route_scope(state: FinePrintState):
     if state["is_in_scope"]:
         return "in_scope"
@@ -74,7 +83,15 @@ builder.add_conditional_edges(
     },
 )
 
-builder.add_edge("improve_strategy", "retrieve_context")
+builder.add_conditional_edges(
+    "improve_strategy",
+    route_improvement,
+    {
+        "retrieve_again": "retrieve_context",
+        "regenerate": "generate_answer",
+    },
+)
+
 builder.add_edge("generate_final_answer", END)
 builder.add_edge(
     "generate_insufficient_evidence_answer",
