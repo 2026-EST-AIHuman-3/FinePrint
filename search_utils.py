@@ -13,9 +13,9 @@ from chromadb.utils import embedding_functions
 
 
 try:
-    from .config import DB_PATH, COLLECTION_NAME, EMBEDDING_MODEL
+    from .config import DB_PATH, COLLECTION_NAME, EMBEDDING_MODEL, expand_service_name
 except ImportError:
-    from config import DB_PATH, COLLECTION_NAME, EMBEDDING_MODEL
+    from config import DB_PATH, COLLECTION_NAME, EMBEDDING_MODEL, expand_service_name
 
 DOMAIN_KEYWORDS = [
     "청약철회",
@@ -88,7 +88,11 @@ def build_where_filter(
             conditions.append({"type": {"$in": doc_type}})
 
     if service_name:
-        conditions.append({"service_name": service_name})
+        candidates = expand_service_name(service_name)
+        if len(candidates) == 1:
+            conditions.append({"service_name": candidates[0]})
+        else:
+            conditions.append({"service_name": {"$in": candidates}})
 
     if not conditions:
         return None
