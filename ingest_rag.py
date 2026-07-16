@@ -20,6 +20,7 @@ from __future__ import annotations
 
 import hashlib
 import re
+from datetime import datetime, timezone
 from pathlib import Path
 
 import chromadb
@@ -209,6 +210,28 @@ def infer_service_name(path: Path, doc_type: str) -> str:
         return parts[terms_index + 1]
 
     return "unknown"
+
+
+def infer_faq_service_name(path: Path) -> str:
+    """FAQ 파일 경로 기반 service_name 추론.
+    RAG/terms/<service>/*.json 또는 RAG/faq/<service>/*.json 형태면 해당 폴더명 사용.
+    그 외(법률/공통 FAQ 등 특정 서비스에 속하지 않는 경우)는 law/guideline과 동일하게 'none'.
+    infer_service_name과 달리, 하위 폴더가 없어 파일명이 그대로 service_name으로
+    잘못 흡수되는 경우(RAG/faq/kca_faq.json -> "kca_faq")를 명시적으로 걸러낸다."""
+    parts = path.parts
+
+    if "terms" in parts:
+        terms_index = parts.index("terms")
+        if len(parts) > terms_index + 1:
+            return parts[terms_index + 1]
+
+    if "faq" in parts:
+        faq_index = parts.index("faq")
+        # parts[faq_index+1]이 파일명 자체라면(하위 폴더 없이 바로 파일) 서비스 폴더가 아니므로 제외
+        if len(parts) > faq_index + 1 and parts[faq_index + 1] != path.name:
+            return parts[faq_index + 1]
+
+    return "none"
 
 
 DOC_SUBTYPE_KEYWORDS = {
@@ -408,6 +431,34 @@ def delete_by_source(source_id: str) -> None:
         print(f"[CLEANUP] 기존 청크 {len(existing['ids'])}개 삭제 (재삽입 전): {source_id}")
 
 
+def compute_document_hash(text: str) -> str:
+    """공백 차이로 인한 해시 불일치를 줄이기 위해 정규화 후 해시.
+    청크별 content_hash(청킹 이후, chunk 단위)와 달리 청킹 이전 전체 문서 기준으로 계산해,
+    같은 문서가 URL 크롤링/붙여넣기 등 다른 경로로 들어와도 동일 해시를 갖도록 한다."""
+    normalized = re.sub(r"\s+", "", text)
+    return hashlib.md5(normalized.encode("utf-8")).hexdigest()
+
+
+def find_duplicate_source(
+    service_name: str, document_hash: str, exclude_source_id: str
+) -> str | None:
+    """같은 service_name + 같은 document_hash를 가진 '다른' source_id가 이미 있는지 확인.
+    같은 source_id의 재수집(약관 개정 등 업데이트)은 upsert_chunks의 delete_by_source가
+    이미 교체 처리하므로 여기서는 대상이 아니다 — 이 함수는 '다른 경로로 들어온 동일 내용'
+    (예: 같은 약관을 URL로도, 붙여넣기로도 넣은 경우)만 잡는다."""
+    if not document_hash:
+        return None
+
+    results = collection.get(
+        where={"$and": [{"service_name": service_name}, {"document_hash": document_hash}]}
+    )
+    for meta in results["metadatas"]:
+        source = meta.get("source")
+        if source and source != exclude_source_id:
+            return source
+    return None
+
+
 def upsert_chunks(
     source_id: str,
     source_label: str,
@@ -417,6 +468,7 @@ def upsert_chunks(
     source_kind: str = "file",
     doc_subtype: str = "unknown",
     scope: str = "service_specific",
+    document_hash: str = "",
 ) -> None:
     delete_by_source(source_id)
 
@@ -426,6 +478,7 @@ def upsert_chunks(
     ids = []
     documents = []
     metadatas = []
+    updated_at = datetime.now(timezone.utc).isoformat()
 
     for index, chunk in enumerate(chunks):
         ids.append(make_chunk_id(source_id, index, chunk))
@@ -442,6 +495,8 @@ def upsert_chunks(
                 "chunk_index": index,
                 "article": extract_article(chunk),
                 "content_hash": hashlib.md5(chunk.encode("utf-8")).hexdigest(),
+                "document_hash": document_hash,  # 문서 단위 해시 (다른 source_id 간 중복 탐지용)
+                "updated_at": updated_at,  # 이 청크가 (재)삽입된 시각
             }
         )
 
@@ -465,6 +520,18 @@ def ingest_text(
         return False
 
     text = clean_scraped_text(text)
+    document_hash = compute_document_hash(text)
+
+    duplicate_source = find_duplicate_source(
+        service_name, document_hash, exclude_source_id=source_id
+    )
+    if duplicate_source:
+        print(
+            f"[SKIP] 동일 내용이 이미 다른 source로 등록되어 있습니다: "
+            f"{duplicate_source} (신규 source: {source_id})"
+        )
+        return False
+
     scope = infer_scope(text)
     if scope == "shared":
         print(f"[WARNING] 여러 서비스 공통 적용 문서로 감지됨(scope=shared): {source_label}")
@@ -475,7 +542,17 @@ def ingest_text(
         print(f"[SKIP] 청킹 결과 없음: {source_label}")
         return False
 
-    upsert_chunks(source_id, source_label, doc_type, service_name, chunks, source_kind, doc_subtype, scope)
+    upsert_chunks(
+        source_id,
+        source_label,
+        doc_type,
+        service_name,
+        chunks,
+        source_kind,
+        doc_subtype,
+        scope,
+        document_hash,
+    )
     print(f"[DONE] {source_label} -> {len(chunks)} chunks")
     return True
 
@@ -703,6 +780,7 @@ def upsert_faq_items(
     ids = []
     documents = []
     metadatas = []
+    updated_at = datetime.now(timezone.utc).isoformat()
     
     for index, item in enumerate(faq_items):
         question = item.get("question", "").strip()
@@ -738,6 +816,7 @@ def upsert_faq_items(
                 "question": question,  # 질문 원문 (인용용)
                 "answer": answer,      # 답변 원문 (인용용)
                 "content_hash": hashlib.md5(document.encode("utf-8")).hexdigest(),
+                "updated_at": updated_at,
             }
         )
     
@@ -759,11 +838,8 @@ def ingest_faq_file(path: Path) -> bool:
     if faq_items is None:
         return False
     
-    # service_name 추론 (같은 로직 재사용 가능)
-    service_name = infer_service_name(path, "terms")  # terms 로직으로 폴더 구조 파싱
-    if service_name == "unknown":
-        # 폴더 구조 없으면 파일명 기반
-        service_name = path.stem
+    # service_name 추론 (FAQ 전용: 서비스 폴더가 없으면 파일명이 아니라 "none"으로 처리)
+    service_name = infer_faq_service_name(path)
     
     print(f"[LOAD] {path}")
     print(f"[META] type=faq, service_name={service_name}, items={len(faq_items)}")
