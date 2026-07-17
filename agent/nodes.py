@@ -23,6 +23,7 @@ generation_llm = init_chat_model(
     temperature=0.3
 )
 # generation_llm
+# ├─ 1차 답변 생성
 # ├─ 개선 전략 작성
 # └─ 최종 답변 작성
 
@@ -93,7 +94,7 @@ def classify_intent(state: FinePrintState):
 
 # Hybrid RAG 검색
 def retrieve_context(state: FinePrintState):
-    return retrieve_rag_context(
+    result = retrieve_rag_context(
         service_name=state["service_name"],
         user_question=state["user_question"],
         improvement_instruction=state.get(
@@ -101,6 +102,28 @@ def retrieve_context(state: FinePrintState):
             "",
         ),
     )
+
+    return {
+        **result,
+        "round_logs": [
+            {
+                "stage": "retrieve_context",
+                "retry_count": state.get("retry_count", 0),
+                "service_name": state["service_name"],
+                "query": state["user_question"],
+                "improvement_instruction": state.get(
+                    "improvement_instruction",
+                    "",
+                ),
+                "terms_context_preview": result[
+                    "terms_context"
+                ][:300],
+                "consumer_context_preview": result[
+                    "consumer_protection_context"
+                ][:300],
+            }
+        ],
+    }
 
 # 쉬운 말 / 답변 생성
 def generate_answer(state: FinePrintState):  
@@ -117,7 +140,13 @@ def generate_answer(state: FinePrintState):
     )
 
     prompt = f"""
-    당신은 FinePrint의 1차 답변 생성 Agent입니다.
+    당신은 구독형 서비스의 약관과 소비자 보호 기준을 근거로
+    사용자의 문제 상황을 설명하는 중립적인 AI 안내 도우미입니다.
+
+    당신은 해당 서비스의 직원이나 고객센터 상담원이 아니며,
+    법률 자문을 제공하는 역할도 아닙니다.
+    서비스를 대신해 답변하거나 해당 서비스 소속인 것처럼 말하지 마세요.
+    사용자에게 직접 설명하는 중립적인 안내 관점으로 답변하세요.
 
     [서비스명]
     {service_name}
@@ -137,26 +166,49 @@ def generate_answer(state: FinePrintState):
     [이전 검증 결과에 따른 개선 지시]
     {improvement_instruction}
 
-    제공된 근거만 사용해 사용자 질문에 직접 답하세요.
+    다음 규칙을 지켜 답변하세요.
 
-    다음 원칙을 지키세요.
+    1. 제공된 근거에 포함된 내용만 사용하세요.
+    2. 서비스 약관과 소비자 보호 기준을 구분하여 설명하세요.
+    3. 환불, 해지, 보상 가능 여부를 조건 없이 확정하지 마세요.
+    4. 약관의 기준 시점을 바꾸지 마세요.
+       예를 들어 약관이 "결제일로부터 7일 이내"라고 규정한 경우,
+       이를 "해지 후 7일 이내"라고 바꾸어 표현하지 마세요.
 
-    1. 모든 답변은 한국어로 작성하세요.
-    2. 약관 근거와 소비자 보호 근거를 구분해서 설명하세요.
-    3. 제공된 근거에 없는 사실을 추측하지 마세요.
-    4. 환불 가능 여부 등을 근거 없이 확정하지 마세요.
-    5. 근거가 부족한 부분은 추가 확인이 필요하다고 표현하세요.
-    6. 개선 지시가 있다면 반드시 반영하세요.
-    7. 개선 지시가 없다면 최초 답변을 생성하세요.
+    5. 조건이나 사실이 확인되지 않았다면 확인이 필요하다고 설명하세요.
+    6. 소비자 보호 기준이 현재 서비스와 사용자 상황에 직접 적용되는지 불분명하면,
+       이를 확정적인 권리나 환급 기준처럼 제시하지 마세요.
+       적용 가능성을 설명할 필요가 없다면 해당 근거는 답변에서 생략하세요.
+    7. 사용자의 주장만으로 해지 완료, 결제 원인, 콘텐츠 이용 여부 등을
+       사실로 확정하지 마세요.
+    8. 제공된 근거가 일반적인 약관 조건을 설명하더라도,
+       그 조건을 사용자의 실제 결제 원인이나 문제 원인으로 추정하지 마세요.
+    9. 실제 원인이 확인되지 않았다면 가능한 원인을 만들어 설명하지 말고,
+       해지 완료 시점, 결제일, 계정 상태 등 확인이 필요한 사실만 안내하세요.
+        잘못된 예:
+        "자동 갱신 설정 때문에 결제되었을 수 있습니다."
+        "해지가 늦게 처리되어 결제가 발생했을 가능성이 있습니다."
 
-    근거를 요약할 때 원문의 의미를 확대하거나 바꾸지 마세요.
-    특히 "다른 등록 결제 수단으로 청구할 수 있음"을 "결제 수단을 자동으로 갱신함"으로 표현하지 마세요.
+        올바른 예:
+        "현재 근거만으로는 결제가 발생한 원인을 확인할 수 없습니다."
+        "결제일 이전에 해지가 완료되었는지와 실제 결제 시점을 확인해야 합니다."
+
+    10. 답변은 쉽고 자연스러운 한국어로 작성하세요.
+    11. 서비스 담당자처럼 인사하거나 서명하지 마세요.
     """
 
     response = generation_llm.invoke(prompt)
 
     return {
-        "draft_answer": response.content
+        "draft_answer": response.content,
+        "round_logs": [
+            {
+                "stage": "generate_answer",
+                "retry_count": state.get("retry_count", 0),
+                "draft_answer": response.content,
+                "improvement_instruction": improvement_instruction,
+            }
+        ],
     }
 
 # 근거 검증 Agent
@@ -187,31 +239,42 @@ def verify_answer(state: FinePrintState):
     {draft_answer}
 
     생성된 답변의 주요 주장들이 제공된 근거로
-    충분히 뒷받침되는지 검증하세요.
+    충분히 뒷받침되는지 다음 기준으로 검증하세요.
 
-    다음 사항을 확인하세요.
+    1. 답변이 사용자 질문과 직접 관련되어 있는가?
+    2. 답변의 모든 핵심 주장이 제공된 근거에서 확인되는가?
+    3. 근거에 없는 조건, 사실, 권리, 보상 내용을 추가하지 않았는가?
+    4. 환불이나 보상 가능성을 근거보다 강하게 확정하지 않았는가?
+    5. 사용자 진술을 검증된 사실처럼 단정하지 않았는가?
+    6. 근거에 없는 원인, 경위 또는 가능성을 추정하여 제시하지 않았는가?
+       "가능성이 있습니다", "때문일 수 있습니다"와 같은 표현도 그 가능성이 제공된 근거에서 확인되지 않으면 근거 밖 추측으로 판단하세요.
+    7. 소비자 보호 기준이 현재 서비스 유형과 사용자 상황에 직접 적용 가능한지 확인했는가?
+    8. 적용 범위가 불분명한 소비자 보호 기준을 확정적인 권리나 환급 기준처럼 제시하지 않았는가?
+    9. 해당 서비스의 직원, 고객센터 상담원 또는 법률 전문가인 것처럼 자신의 신분을 표현했는가?
+       단순히 공식 고객센터 문의를 안내한 것은 역할 사칭으로 판단하지 마세요.
 
-    1. 답변에 근거 문서에 없는 사실이 포함되어 있는가
-    2. 환불 가능, 위법, 보상 가능 등 확정적인 표현에 직접 근거가 있는가
-    3. 사용자에게 제안한 다음 행동이 근거와 모순되지 않는가
-    4. 답변에 필요한 핵심 근거가 누락되어 있는가
-    5. 검색된 근거가 사용자의 실제 질문과 직접 관련되어 있는가
-    6. 생성된 답변이 사용자의 질문과 주요 문제 유형에 직접 답하고 있는가
-    7. 답변과 근거가 서로 일치하더라도, 사용자의 질문과 무관한 내용이면 FAIL로 판단하세요.
-    8. 소비자 보호 기준이 해당 서비스 유형 또는 업종에 실제로 적용되는지 확인하세요.
-       검색 청크에 적용 대상이나 업종 정보가 없으면 일반적으로 적용 가능한 기준이라고 단정하지 마세요.
-    
+    충분한 근거가 있고 답변이 근거와 일치하면 PASS로 판단하세요.
+    근거 부족, 근거 밖 추측, 과도한 단정 또는 역할 사칭이 있으면 FAIL로 판단하세요.
+
+    FAIL인 경우 suggested_action을 다음 기준으로 선택하세요.
+
+    - 질문에 답하기 위한 핵심 근거가 부족하거나 무관하면
+      RETRIEVE_AGAIN
+    - 기존 근거는 충분하지만 답변의 표현, 조건 누락, 과도한 단정 또는 역할 사칭만 수정하면 되면
+      REGENERATE
+
+    RETRIEVE_AGAIN인 경우에만
+    실제로 추가로 필요한 근거를 missing_evidence에 작성하세요.
+
+    REGENERATE인 경우에는
+    missing_evidence를 빈 목록으로 반환하고,
+    수정해야 할 답변의 문제를 reason에 설명하세요.
+
     reason과 missing_evidence는 반드시 한국어로 작성하세요.
-       
-    예를 들어, 사용자 질문이 계정 정지 사유에 관한 것인데
-    검색 근거와 생성 답변이 해지, 결제, 환불만 다룬다면 FAIL입니다.
 
-    충분한 근거가 있다면 PASS,
-    근거 부족 또는 근거 밖 추측이 있다면 FAIL로 판단하세요.
-
-    FAIL인 경우 부족한 근거를 missing_evidence에 작성하고,
-    추가 문서 검색이 필요하면 RETRIEVE_AGAIN,
-    근거는 충분하지만 답변 표현 수정이 필요하면 REGENERATE를 선택하세요.
+    예를 들어 사용자 질문이 계정 정지 사유에 관한 것인데,
+    검색 근거와 생성 답변이 해지, 결제, 환불만 다룬다면 FAIL이며
+    suggested_action은 RETRIEVE_AGAIN입니다.
 
     사용자의 사실관계가 아직 확인되지 않았더라도,
     제공된 근거에 명확한 조건부 기준이 있고
@@ -219,8 +282,10 @@ def verify_answer(state: FinePrintState):
     근거 부족만을 이유로 FAIL로 판단하지 마세요.
 
     예:
-    "결제일로부터 7일 이내이고 콘텐츠를 이용하지 않았다면 환불을 요청할 수 있습니다.
-    실제 해당 여부는 결제일, 해지 시점, 이용 여부 확인이 필요합니다."
+    "결제일로부터 7일 이내이고 콘텐츠를 이용하지 않았다면
+    환불을 요청할 수 있습니다.
+    실제 해당 여부는 결제일, 해지 시점,
+    이용 여부 확인이 필요합니다."
 
     위와 같은 조건부 안내는 PASS로 판단할 수 있습니다.
 
@@ -236,9 +301,17 @@ def verify_answer(state: FinePrintState):
         "verification_reason": result.reason,
         "missing_evidence": result.missing_evidence,
         "suggested_action": result.suggested_action,
+        "round_logs": [
+            {
+                "stage": "verify_answer",
+                "retry_count": state.get("retry_count", 0),
+                "status": result.status,
+                "reason": result.reason,
+                "suggested_action": result.suggested_action,
+            }
+        ],
     }
 
-# 근거 검증 루프
 # 근거 검증 실패 개선 전략 생성
 def improve_strategy(state: FinePrintState):
     service_name = state["service_name"]
@@ -297,6 +370,14 @@ def improve_strategy(state: FinePrintState):
     return {
         "improvement_instruction": result.improvement_instruction,
         "retry_count": retry_count + 1,
+        "round_logs": [
+            {
+                "stage": "improve_strategy",
+                "retry_count": retry_count + 1,
+                "suggested_action": suggested_action,
+                "instruction": result.improvement_instruction,
+            }
+        ],
     }
 
 # 최종 답변 생성
@@ -350,7 +431,7 @@ def generate_final_answer(state: FinePrintState):
     [검증 결과 설명]
     {verification_reason}
 
-    [재검색 횟수]
+    [검증 후 재시도 횟수]
     {retry_count}
 
     다음 원칙을 반드시 지키세요.
@@ -363,8 +444,11 @@ def generate_final_answer(state: FinePrintState):
     6. 사용자가 실제로 확인하고 행동할 수 있도록 구체적으로 안내하세요.
     7. 근거가 부족한 부분은 추가 확인이 필요하다고 명확히 표현하세요.
     8. 문의문 초안은 사용자 상황에 맞게 자연스럽고 정중한 한국어로 작성하세요.
-    9. 문의문 초안은 반드시 사용자가 서비스 고객센터에 직접 문의하는 1인칭 관점으로 작성하세요.
-       고객센터가 사용자에게 답변하는 형태로 작성하지 마세요.
+    9. inquiry_draft는 사용자가 고객센터에 보내는 1인칭 문의문으로 작성하세요.
+       서비스 직원의 관점으로 작성하지 마세요.
+       확인되지 않은 정보는
+       [취소 날짜 입력], [결제 날짜 입력], [이용 여부 입력]처럼
+       항목을 알 수 있는 구체적인 자리표시자로 작성하세요.
 
     10. 사용자가 제공하지 않은 사실은 절대 확정하거나 추정하지 마세요.
         특히 다음 정보가 확인되지 않았다면 사실처럼 작성하지 마세요.
@@ -399,12 +483,50 @@ def generate_final_answer(state: FinePrintState):
     14. required_materials에는 사용자가 실제로 준비할 수 있는 자료만 포함하세요.
         법령, 소비자 보호 기준, 내부 정책 문서는 포함하지 마세요.
 
+        좋은 예:
+        - 결제 내역 또는 영수증
+        - 해지 완료 이메일이나 화면 캡처
+        - 고객센터 문의 내역
+        - 사용자가 기억하는 콘텐츠 이용 여부
+
+        나쁜 예:
+        - 사업자 내부 이용 기록
+        - 사업자 내부 시스템 정보
+        - 법률 원문
+        - 소비자 보호 지침 원문
+        - 사용자가 직접 확보하기 어려운 내부 자료
+    
+    15. 사용자가 직접 확인하거나 준비하기 어려운 사업자 내부 정보는
+        next_actions 또는 required_materials에 포함하지 마세요.
+
+        예:
+        - 내부 콘텐츠 이용 기록
+        - 내부 결제 처리 로그
+        - 내부 계정 상태 기록
+
+        대신 다음처럼 안내하세요.
+        - 사용자가 기억하는 콘텐츠 이용 여부를 확인
+        - 결제 내역이나 해지 완료 화면 준비
+        - 필요한 내부 기록은 고객센터에 확인 요청
+    
+    16. 사용자가 직접 수행할 수 없는 행동을 제안하지 마세요.
+        사업자 내부 기록 확인이 필요한 경우,
+        사용자가 직접 확인하라고 하지 말고 고객센터에 확인을 요청하도록 안내하세요.
+
     검증 상태가 FAIL인 경우,
     확인되지 않은 내용을 사실처럼 작성하지 마세요.
 
     현재 확보된 문서만으로 판단하기 어려운 부분은
     "현재 확보된 문서만으로는 충분한 근거를 확인하기 어렵습니다."
     라고 명확히 안내하세요.
+
+
+    약관에 일반적인 결제 조건이 기재되어 있더라도,
+    이를 사용자의 실제 결제 원인으로 추정하지 마세요.
+
+    실제 결제 원인이 확인되지 않았다면
+    "현재 근거만으로 결제 원인을 확인할 수 없다"고 안내하고,
+    해지 완료 시점과 결제 시점 확인을 check_items에 포함하세요.
     """
 
     result = final_answer_llm.invoke(prompt)

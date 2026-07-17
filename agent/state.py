@@ -1,4 +1,5 @@
-from typing import TypedDict
+from typing import TypedDict, Annotated
+from operator import add
 
 class FinePrintState(TypedDict):
     service_name: str
@@ -22,5 +23,6 @@ class FinePrintState(TypedDict):
 
     improvement_instruction: str
     retry_count: int
+    round_logs: Annotated[list[dict], add]
 
     final_answer: dict
