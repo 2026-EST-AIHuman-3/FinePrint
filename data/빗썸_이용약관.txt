@@ -1,0 +1,68 @@
+Accept Terms and Conditions
+DeFi Lending Terms and Conditions
+1. Purpose
+
+The terms and conditions set forth herein is to exercise the rights, obligations, responsibilities and other necessary matters with respect to the Agreement between DeFi Co., Ltd. (the “Company”) who provides the virtual asset lending services (the “Service”) and members who seek the Service. (the “Service User”).
+
+2. Conditions for the Service
+
+A type of virtual asset and its quantity (the “Principal amount”), service rates, a period of the Service (not less than 3 Business Days), deposit and so forth, which associated with the Service shall be determined in accordance with the terms set forth herein between the Company and the Service User (the “Agreement”).
+
+3. Service Offer
+The Service pursuant to these terms and conditions shall be executed by the Company transferring the Principal amount to the User’s wallet address (the “Account”).
+The Company shall notify the Service User of the Service details including without limitation to the Principal amount, rates, maturity date, deposit via SMS.
+4. Deposit
+Pursuant to these terms and conditions, the Service User shall place an amount of payment to the Company (the “Payment”), and the minimum Payment shall be calculated by the “Amount Available for Services Method” detailed in Service User Guide. The Payment will be held in the Service User’s account until the maturity date, and the Company shall maintain their financial obligations and responsibilities during the Service period.
+The Company may require the Service User for additional payments subject to section 5.1, and the Service User may put the additional payment into their account.
+5. Trigger Clause
+
+The Service User must return the Payment immediately where:
+
+the current value of the Principal amount including the service charge reaches 90% of the Payment due to the fact that fluctuation of the quoted rate for the virtual asset of the Principal amount;
+the Service is associated with money laundering scheme.
+6. Repayment
+Where “Repayment at maturity”, the Service User shall repay the Principal amount together with service fee quoted by the agreed rate at the Service’s maturity date. If it is required to pull the fund from the Payment due to the insufficient fund to return the Principal amount, 0.1% of the Principal amount shall be charged.
+Where “interim repayment”, the Service User shall repay the Principal amount as well as a fee that is calculated based on the rate of the maturity date prior to the its initially agreed period of the maturity. A partial payment shall not be accepted in the case of interim repayment.
+“Automatic repayment” is described as follows:
+1. The automatic repayment
+
+* The automatic repayment means the Company shall withdraw the Principal amount from the Service User’s account when the event of default subject to section 5 occurs.
+Extra fee(0.1% of the principal amount) will be charged in this case.
+
+2. Methods
+Case	Repayment Asset
+Priority	Next Priority
+If the Account contains Principals and same value of virtual asset as the Principal	Virtual asset	Payment
+If the Account does not contains Principals and same value of virtual asset as the Principal	Payment	-
+7. Repayment
+
+The repayment under Section 6 shall be processed through an automatic withdrawal from the Service User’s account.
+
+8. Repayment insufficiency
+
+If the Service User’s account has insufficient amount for the repayment in relation to the Principal amount and the service charges incurred, it will be withdrawn the service charges and then the Principal amount in order.
+
+9. Assignment of Obligations
+
+At any time, the Company may assign its rights and under this Section 9 in whole or in part to any third party.
+
+10. Limitation of Liability
+
+The Company shall NOT be liable to the Service User for any of the damages arising from the followings, unless otherwise caused by reason of the intention, negligence or other fault of the Company:
+
+if the Service User breaches any other material provisions hereunder, Service User Guide or applicable law;
+account information leakage;
+in the event of a defect in blockchain system or management of mining of the virtual asset, technical issue, a regular server inspection and any other event that inevitably leads to service failure;
+a service failure caused by force majeure incidents such as a natural disaster, DDos attacks, IDC incident, sudden surges in web traffic, a defect of the line of telecommunications operators.
+11. Other Terms and Conditions
+
+Subject to the Service User Guide including an example of usage, guidelines and so forth, any materials relating to these terms and conditions can be informed to the Service User or obtain consent from the Service User, the Service User Guide shall prioritize when these terms and conditions are conflicting to the content of the consent. The terms not defined herein shall be interpreted in accordance with the relevant laws of Republic of Korea and generally accepted business practices.
+
+12. Jurisdiction and Governing Laws
+These Terms and Conditions and the Service contemplated hereby shall be governed by, and construed and interpreted in accordance with the Laws of the Republic of Korea.
+Any action seeking legal or equitable relief arising out of or relating to these Terms or the Manual will be brought only in the courts of the Seoul Central District.
+
+<ADDENDA>
+These Terms and Conditions is effective as of 15 January 2020.
+
+Confirm

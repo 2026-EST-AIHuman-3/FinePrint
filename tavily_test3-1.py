@@ -103,6 +103,9 @@ TERMS_PATH_KEYWORDS = [
     "terms", "terms-of-service", "terms_and_conditions", "tos", "legal", "policy", "privacy"
 ]
 
+# 명시적으로 제외할 플랫폼/호스트 (스토어 및 블로그)
+PLATFORM_DOMAINS = ["apps.apple.com", "play.google.com", "blog.naver.com"]
+
 def get_service_name():
     return input("구독형 서비스명을 입력하세요: ").strip()
 
@@ -209,6 +212,12 @@ def select_best_result(service_name, search_results):
         snippet = (r.get('content') or '')
 
         score = 0
+        host = urlparse(url).netloc.lower()
+        # 앱스토어 / 플레이스토어 / 네이버 블로그 즉시 제외
+        low_url = url.lower()
+        if any(p in host for p in PLATFORM_DOMAINS) or any(p in low_url for p in PLATFORM_DOMAINS):
+            logging.info(f"Excluding platform/blog candidate: {url}")
+            continue
         # 도메인이 서비스명과 무관하면 후보에서 제외
         try:
             if not host_related(url, service_name):
