@@ -684,14 +684,13 @@ def render_and_extract_deep(url, max_links=12, min_length=1500):
 
 def save_tos_to_file(service_name, content):
     base_dir = os.path.dirname(os.path.abspath(__file__))
-    data_dir = os.path.join(base_dir, "data")
-    os.makedirs(data_dir, exist_ok=True)
+    # RAG/terms/<서비스명>/terms.txt 형태로 저장
+    terms_dir = os.path.join(base_dir, "RAG", "terms")
 
     def has_korean(text):
         return bool(re.search(r'[\uac00-\ud7a3]', text))
 
     def extract_ascii_text(text):
-        # 한글과 섞여 있어도 영문/숫자 토큰만 추출하여 서비스명을 표준화
         tokens = re.findall(r'[A-Za-z0-9]+', text)
         return ' '.join(tokens).strip()
 
@@ -706,11 +705,8 @@ def save_tos_to_file(service_name, content):
         return name
 
     def make_safe_name(name, max_len=100):
-        # 정규화
         name = unicodedata.normalize('NFKC', name)
-        # 소문자
         name = name.lower()
-        # 불허 문자 -> 언더스코어
         name = re.sub(r'[^0-9a-z\-\_가-힣]+', '_', name)
         name = re.sub(r'_+', '_', name).strip('_')
         if len(name) > max_len:
@@ -721,7 +717,12 @@ def save_tos_to_file(service_name, content):
 
     canonical_name = canonicalize_service_name(service_name)
     safe_name = make_safe_name(canonical_name)
-    file_path = os.path.join(data_dir, f"{safe_name}_이용약관.txt")
+
+    # 서비스명 폴더 생성: RAG/terms/<서비스명>/
+    service_dir = os.path.join(terms_dir, safe_name)
+    os.makedirs(service_dir, exist_ok=True)
+
+    file_path = os.path.join(service_dir, "terms.txt")
 
     with open(file_path, "w", encoding="utf-8") as f:
         f.write(content)
