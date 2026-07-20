@@ -23,26 +23,20 @@ import re
 from datetime import datetime, timezone
 from pathlib import Path
 
-import chromadb
-from chromadb.utils import embedding_functions
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from PyPDF2 import PdfReader
 
-
-from config import DB_PATH, COLLECTION_NAME, EMBEDDING_MODEL
+# search_utils.py가 이미 만들어둔 collection을 그대로 재사용한다.
+# ingest와 search가 각자 별도의 PersistentClient 인스턴스를 갖고 있으면
+# (같은 프로세스 안에서도) 한쪽이 쓴 내용이 다른 쪽에 바로 반영된다는 보장이 없어서,
+# "크롤링 -> ingest -> 바로 검색" 같은 한 흐름 안에서 방금 넣은 데이터가 안 보이는
+# 문제가 생길 수 있다. 객체를 하나로 통일해 이 문제를 원천적으로 없앤다.
+try:
+    from .search_utils import collection
+except ImportError:
+    from search_utils import collection
 
 RAG_PATH = "./RAG"
-
-
-embedding_fn = embedding_functions.SentenceTransformerEmbeddingFunction(
-    model_name=EMBEDDING_MODEL
-)
-
-client = chromadb.PersistentClient(path=DB_PATH)
-collection = client.get_or_create_collection(
-    name=COLLECTION_NAME,
-    embedding_function=embedding_fn,
-)
 
 
 def check_document_exists(service_name: str, doc_subtype: str | None = None) -> bool:
