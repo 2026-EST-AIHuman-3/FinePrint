@@ -1,4 +1,4 @@
-# Byte-compiled / optimized / DLL files
+\# Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[codz]
 *$py.class
@@ -287,3 +287,13 @@ retrieval_logs.jsonl
 # 운영체제 파일
 .DS_Store
 Thumbs.db
+
+# data 폴더의 재현용 원본·테스트 데이터는 포함
+!data/
+!data/**/
+!data/**/*.txt
+!data/**/*.pdf
+!data/**/*.json
+!data/**/*.jsonl
+
+
