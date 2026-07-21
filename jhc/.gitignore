@@ -230,3 +230,6 @@ logs/
 # Environment
 .venv/
 .env
+
+# test files
+test/
