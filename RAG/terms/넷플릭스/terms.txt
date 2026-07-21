@@ -1,46 +1,109 @@
-Netflix 이용 약관
-Netflix에 오신 것을 환영합니다! Netflix는 사용자가 인터넷 연결 지원 TV, 컴퓨터 및 기타 디바이스(‘넷플릭스 지원 디바이스’)에서 인터넷을 통해 엔터테인먼트 콘텐츠(‘Netflix 콘텐츠’)에 액세스할 수 있도록 하는 서비스를 제공합니다.
-본 이용 약관은 귀하가 Netflix 서비스를 이용하는 데 적용됩니다. 본 이용 약관에서 사용하는 ‘Netflix 서비스’, ‘당사 서비스’ 또는 ‘본 서비스’란 Netflix 콘텐츠를 탐색하고 액세스할 수 있도록 Netflix가 제공하는 서비스를 의미합니다. 여기에는 모든 개인 맞춤형 요소, 특성과 기능, 추천 콘텐츠와 후기, Netflix 웹사이트, 애플리케이션 및 사용자 인터페이스뿐만 아니라 Netflix 서비스와 관련된 모든 콘텐츠와 소프트웨어가 포함됩니다.
-1. Netflix 서비스
-1.1. Netflix 서비스 이용. Netflix 서비스를 이용하려면 인터넷 액세스 및 넷플릭스 지원 디바이스가 필요합니다. 일부 기능, 콘텐츠 또는 제공 사항은 무료로 제공될 수 있으며, 계정을 생성하거나 결제 수단을 등록하지 않고도 이용할 수 있습니다. 다만, 기타 옵션의 경우 아래에 명시된 구독 약관에 따라 Netflix 계정을 생성하거나 구독권을 구매해야 할 수 있습니다. 또한 동일한 가구에 속한 경우 계정 소유자의 구독 하에 프로필 사용자로서 Netflix 서비스를 이용할 수 있으며, 계정 소유자와 동일한 가구에 거주하지 않는 경우에는 추가 회원으로서 Netflix 서비스를 이용할 수 있습니다. 본 약관에서 사용하는 ‘계정 소유자’란 Netflix 계정을 생성하고, 그의 결제 수단으로 구독에 대한 요금이 청구되는 사용자를 의미합니다.
-1.2. 연령 제한. Netflix 계정을 생성하거나 추가 회원이 되기 위해서는 19세 이상이어야 합니다. 미성년자의 경우 성인의 감독하에서만 서비스를 이용할 수 있습니다.
-1.3. 오퍼(Offers). Netflix는 수시로 특별 프로모션(추첨 행사, 할인 및 기타 인센티브 등), 요금제 또는 구독권(‘오퍼’)을 제공하는 경우가 있습니다. 오퍼 이용 자격은 Netflix의 단독 재량에 따라 결정되며, Netflix는 귀하가 해당 자격을 갖추지 않은 것으로 확인될 경우 오퍼 제공을 철회하고 계정을 보류 조치할 권리를 보유합니다. 기존 Netflix 계정을 보유하고 있거나 최근에 가입한 가구의 구성원에게는 특정 신규 가입 오퍼의 이용 자격이 주어지지 않을 수도 있습니다. Netflix는 디바이스 ID, 결제 수단, 연락처 정보 등과 같은 정보를 오퍼 이용 자격 판단에 활용할 수 있습니다. 자격 요건 및 기타 제한 사항과 조건은 오퍼 신청 시 또는 귀하에게 전달되는 기타 커뮤니케이션을 통해 공개됩니다.
-1.4. 계정 공유. Netflix 서비스와 이를 통해 이용하는 모든 콘텐츠는 귀하의 개인적, 비상업적 용도로만 사용해야 하며, 추가 회원 계정을 구매한 경우를 제외하고는 귀하의 가구 구성원이 아닌 그 누구와도 공유해서는 안 됩니다.
-1.5. 이용 제한. 귀하는 일차적으로 계정을 생성한 국가 내에서 그리고 Netflix가 구독 요금제를 제공하고 Netflix 콘텐츠에 대한 라이선스를 허용한 지역 내에서만 해당 콘텐츠를 이용할 수 있습니다. 이용 가능한 콘텐츠는 지리적 위치에 따라 달라질 수 있으며, 법률 또는 당사에 콘텐츠를 제공하는 제3자 콘텐츠 제공자가 부여한 권리에 의해 제한될 수 있고, 수시로 변경될 수 있습니다. 광고형 구독 요금제에서는 일부 Netflix 콘텐츠가 제공되지 않을 수 있습니다. 귀하의 동시 시청 가능 디바이스의 수는 귀하가 선택한 구독 요금제에 따라 결정되며 '계정' 페이지에서 확인할 수 있습니다.
-1.6. 이용 가능성 및 테스트. Netflix 콘텐츠를 비롯한 Netflix 서비스는 정기적으로 업데이트됩니다. 또한, Netflix는 웹사이트, 사용자 인터페이스, 프로모션 기능 등 서비스의 다양한 측면에 대한 테스트를 지속적으로 실시합니다. 귀하는 언제든지 '계정' 페이지의 'Netflix 테스터로 참여' 설정을 변경하여 테스트 참여 옵션을 끌 수 있습니다.
-1.7. 콘텐츠 다운로드. 구독 요금제에 따라 일부 Netflix 콘텐츠는 지원되는 특정 디바이스에서 일시적으로 저장하여 오프라인으로 시청할 수 있습니다(이하 ‘오프라인 콘텐츠’). 단, 계정당 허용되는 오프라인 콘텐츠 수, 오프라인 콘텐츠를 저장할 수 있는 디바이스의 최대 수, 오프라인 콘텐츠 시청을 시작해야 하는 기간, 오프라인 콘텐츠를 이용할 수 있는 기간 등에 제약이 따릅니다. 일부 오프라인 콘텐츠는 특정 국가에서 재생할 수 없습니다. 이러한 오프라인 콘텐츠를 스트리밍할 수 없는 국가에서 온라인으로 접속한 경우, 해당 국가에 체류하는 동안에는 해당 오프라인 콘텐츠를 재생할 수 없습니다.
-1.8. 이용 권한 및 제한. 본 약관에 따라 명시적으로 허용된 범위 내에서만 Netflix는 귀하에게 Netflix 서비스에 액세스할 수 있는 제한적이고 비독점적이며 양도 불가능한 권한을 부여합니다. 앞서 언급한 권한을 제외하고는 어떠한 권리, 소유권 또는 이권도 귀하에게 이전되지 않습니다. 귀하는 모든 관련 법률, 규칙, 규정 또는 Netflix 서비스 및 콘텐츠 사용과 관련된 기타 제한에 따라 Netflix 서비스(Netflix 서비스 내의 모든 특성 및 기능을 포함)를 이용하는 데 동의합니다. Netflix에서 명시적으로 허용한 경우를 제외하고, 귀하는 다음의 행위를 하지 않는 데 동의합니다.
-(i) 본 서비스를 상업적 목적 또는 공연을 위해 이용;
-(ii) Netflix 서비스에 포함되어 있거나 Netflix 서비스를 통해 획득한 콘텐츠 및 정보를 아카이브, 복제, 배포, 수정, 전시, 시연, 출판, 라이선스, 2차적 저작물로 생성, 판매 권유 또는 이용;
-(iii) 그래픽 사용자 인터페이스, 광고 또는 광고 기능, 저작권 고지 및 상표를 포함한 Netflix 서비스 내 콘텐츠 보호 기능 또는 기타 요소를 우회, 삭제, 수정, 무효화, 약화, 차단, 가림 또는 훼손;
-(iv) Netflix 서비스에 접근하는 데 로봇, 스파이더, 스크레이퍼 또는 기타 자동화된 수단 이용;
-(v) Netflix 서비스를 통해 접근 가능한 소프트웨어 또는 기타 제품, 프로세스를 디컴파일(decompile), 리버스 엔지니어링(reverse engineering) 또는 디스어셈블(disassemble);
-(vi) 코드나 다른 제품을 삽입하거나 어떤 방식으로든 Netflix 서비스 콘텐츠 조작;
-(vii) 데이터 마이닝, 데이터 수집 또는 추출 방법 사용;
-(viii) 소프트웨어 바이러스나 기타 컴퓨터 코드, 파일이나 프로그램을 포함하여, Netflix 서비스와 관련된 컴퓨터 소프트웨어나 하드웨어 또는 통신 장비의 기능을 방해, 파괴 또는 제한하기 위해 설계된 자료를 업로드, 게시, 이메일 전송, 또는 다른 방식으로 발송 또는 전송; 또는
-(ix) 모든 유형의 머신 러닝 도구, 모델, 시스템, 알고리즘, 제품 또는 기타 기술의 사용, 생성, 개발, 수정, 프롬프트 설계, 미세 조정, 훈련, 테스트, 벤치마크 또는 검증과 관련하여 상기 행위에 관여하는 경우,
-귀하가 본 이용 약관의 1.2조(연령 제한), 1.4조(계정 공유), 1.5조(이용 제한), 1.8조(이용 권한 및 제한) 또는 1.10조(Netflix 소프트웨어 및 업데이트)를 위반하거나, 불법복제, 명의도용, 신용카드 부정 사용 또는 기타 이에 준하는 사기행위 또는 불법행위에 관여하는 경우, Netflix는 귀하의 서비스 이용을 종료하거나 제한할 수 있습니다.
-1.9. 시청 환경 및 기술적 요구 사항. Netflix 콘텐츠의 화면 품질은 디바이스에 따라 달라질 수 있으며 지역, 사용 가능한 인터넷 대역폭이나 인터넷 접속 속도 등 다양한 요인의 영향을 받을 수 있습니다. HD, UHD 및 HDR의 이용 가능 여부는 사용 중인 인터넷 서비스 및 디바이스 성능에 따라 결정됩니다. 공간 음향의 품질은 디바이스의 성능에 따라 다를 수 있습니다. 모든 콘텐츠가 공간 음향 또는 HD, UHD, HDR 등 모든 화질로 제공되는 것은 아니며, 모든 구독 요금제에서 모든 화질이나 형식의 콘텐츠를 이용할 수 있는 것은 아닙니다. HD 영상 화질(720P 이상의 해상도)을 유지하기 위한 최소 연결 속도는 스트리밍당 3.0Mbps이나, 양호한 영상 화질을 위해서는 더 높은 속도를 권장합니다. 풀 HD 영상 화질(1080p 이상의 해상도)을 수신하기 위한 권장 연결 속도는 스트리밍당 5.0Mbps 이상입니다. UHD 영상 화질(4K 이상의 해상도)을 수신하기 위한 권장 연결 속도는 스트리밍당 15.0Mbps 이상입니다. 모든 인터넷 접속 요금은 귀하가 부담합니다. 부과될 수 있는 인터넷 데이터 이용 요금에 대한 세부사항은 인터넷 서비스 제공업체에 확인하시기 바랍니다. Netflix 콘텐츠 시청을 시작하는 데 소요되는 시간은 지역, 해당 시점에 사용 가능한 인터넷 대역폭, 선택한 콘텐츠, 넷플릭스 지원 디바이스의 설정 등 다양한 요인에 따라 달라질 수 있습니다.
-1.10. Netflix 소프트웨어 및 업데이트. Netflix 소프트웨어는 Netflix에 의해 또는 Netflix를 위하여 개발되었으며, 넷플릭스 지원 디바이스로 Netflix 콘텐츠에 대한 허용된 접근을 위해서만 사용할 수 있습니다. Netflix 소프트웨어는 디바이스와 매체별로 달라질 수 있으며, 특성 및 기능도 디바이스마다 다를 수 있습니다. 귀하는 Netflix 서비스 이용을 위해 제3자 라이선스 계약의 대상인 제3자 소프트웨어가 필요할 수 있음을 인지합니다. 귀하는 Netflix 소프트웨어와 관련 제3자 소프트웨어의 업데이트된 버전을 자동으로 다운로드하는 데에 동의합니다.
-1.11. 인터랙티브 기능. Netflix는 서비스의 일부로 특정 인터랙티브 기능(Interactive Features)을 제공할 수 있습니다. ‘인터랙티브 기능’이란 실시간 또는 이에 준하는 기능으로서, 사용자가 프로그램 또는 다른 사용자와 참여하거나 상호작용할 수 있도록 하는 모든 기능을 의미하며, 여기에는 라이브 채팅, 설문조사, 투표, 멀티플레이어 게임, 게임 쇼 및 실시간 투표 등이 포함됩니다. 인터랙티브 기능의 이용은 본 이용 약관, Netflix 커뮤니티 가이드라인 및 해당되는 경우 특정 이벤트에 대해 게시된 공식 규칙의 적용을 받습니다. Netflix는 투표의 무결성, 안전 또는 법적 준수를 보호하기 위해 참여 기록을 기록하거나 보관할 수 있으며, 필요한 경우 투표를 일시 중단하거나 응모를 무효화하거나 결과를 취소하는 등 임시 조치를 취할 수 있습니다. 귀하가 본 이용 약관 또는 Netflix의 정책을 위반한 경우, 귀하의 이용 행위가 즉각적인 안전상 또는 법적 위험을 초래하는 경우, Netflix는 인터랙티브 기능에 대한 접근을 즉시 일시 중단하거나 종료할 수 있습니다.
-2. 구독 약관
-2.1. 결제 주기 및 구매 약관. 귀하의 Netflix 구독은 해지될 때까지 계속 유지됩니다. 구독권을 구매하려면 계정에 하나 이상의 결제 수단을 추가해야 합니다. '결제 수단'이란 현재 유효한 승인된 결제 수단으로서, 필요시 업데이트될 수 있으며 타사 계정을 통한 결제를 포함할 수 있습니다. 결제일 전까지 구독을 해지하지 않을 경우, 다음 결제 주기의 구독 요금이 귀하의 결제 수단으로 청구되는 것을 승인하게 됩니다(아래 '해지' 참조). 구독 요금 및 서비스 이용과 관련하여 발생할 수 있는 기타 청구 금액(예: 세금 및 거래 수수료 등)은 ‘계정’ 페이지에 표시된 특정 결제일에 귀하의 결제 수단으로 청구됩니다. 결제 주기는 귀하가 Netflix 가입 시 선택한 구독 요금제 유형에 따라 결정됩니다. 등록된 결제 수단에 따른 결제가 정상적으로 처리되지 않거나, 귀하가 구독 요금제 유형을 변경하는 경우이거나, 특정 월에 존재하지 않는 날짜에 유료 구독이 시작된 경우 등의 일부 상황에서는 요금 결제일이 변경될 수 있습니다. 다음 결제일은 ‘계정’ 페이지에서 확인할 수 있습니다. 귀하가 귀하의 타사 결제 계정을 결제 수단으로 사용하여 Netflix에 가입한 경우에는, 해당 타사 결제 계정에서 귀하의 Netflix 구독 결제 정보를 확인할 수 있습니다.
-2.2. 결제 수단. 귀하는 기본 결제 수단이 승인 거절되거나 이를 구독 요금 결제에 더 이상 사용할 수 없는 경우, Netflix가 귀하의 계정에 연결된 다른 결제 수단으로 청구하는 것을 승인합니다. 미결제 금액에 대한 책임은 귀하에게 있습니다. 유효기간 만료, 잔고 부족 등의 사유로 결제가 정상적으로 처리되지 않았는데도 귀하가 구독을 해지하지 않는 경우, 유효한 결제 수단에 청구가 완료될 때까지 귀하의 본 서비스 이용이 제한될 수 있습니다. 일부 결제 수단의 경우, 발급자가 귀하에게 해외 거래 수수료나 기타 결제 수단 처리 관련 수수료 등의 수수료를 청구할 수 있습니다. 현지 세금은 사용된 결제 수단에 따라 달라질 수 있습니다. 자세한 사항은 해당 결제 서비스 제공업체를 통해 확인하시기 바랍니다.
-2.3. 결제 수단 업데이트. 귀하는 '계정' 페이지를 통해 결제 수단을 업데이트할 수 있습니다. Netflix에서도 해당 결제 서비스 제공업체에서 제공하는 정보를 이용하여 귀하의 결제 수단을 업데이트할 수 있습니다. 업데이트를 하는 경우, 귀하는 Netflix가 해당 결제 수단으로 계속 청구하는 것을 승인하는 것입니다.
-2.4. 광고 포함 또는 미포함 구독 요금제. Netflix는 광고 포함 또는 미포함 요금제를 포함하여 다양한 구독 요금제를 제공할 수 있습니다. Netflix의 광고 미포함 구독 요금제는 광고로 인한 중단이 없는 경험을 제공하도록 설계되었습니다. 다만, 특정 라이브 또는 특별 이벤트(재방송 포함) 중이거나, 선형 편성 프로그램의 일부로 제공되는 경우, 또는 스트리밍 권리나 기타 법적 또는 계약상 의무에 따라 필요한 경우에는 광고가 표시되는 경우가 있을 수 있습니다. 또한, 모든 구독 요금제에는 브랜디드 콘텐츠 또는 후원 메시지, Netflix 콘텐츠에 대한 프로모션 또는 기타 Netflix 상품 또는 서비스에 대한 정보와 같은 제한된 상업적 내용이 포함될 수 있습니다. Netflix는 광고 대상 타사 제품 또는 서비스를 보증하거나 후원하지 않으며, 인터랙티브 광고 참여를 포함하여 광고주와의 모든 상호 작용은 귀하 본인의 선택이며 책임입니다.
-2.5. 제3자를 통해 취득한 구독. 일부 구독은 제3자가 자체 제품 및 서비스 공급과 연계하여 제공하기도 합니다. 이러한 구독 요금제에는 서로 다른 조건 및 제한 사항이 적용될 수 있으며, 해당 내용은 가입 전에 또는 귀하에게 제공되는 기타 커뮤니케이션을 통해 공개됩니다.
-2.6. 해지. 귀하는 언제든지 Netflix 구독을 해지할 수 있습니다. 구독을 해지하려면 ‘계정’ 페이지로 이동하여 해지 관련 안내를 따르시기 바랍니다. 해지는 결제 기간 종료 시 효력이 발생하나, 2.7조에 따라 해지를 요청한 경우에는 구독이 즉시 종료됩니다. 본 이용 약관 2.7조에서 정한 요건을 충족하는 해지와 Netflix의 고의 또는 과실을 이유로 한 환불 의무를 제외하고, 구독 기간의 일부 또는 이용하지 않은 Netflix 콘텐츠에 대한 환불 또는 크레딧은 제공되지 않습니다. 구독 종료일은 ‘계정’ 페이지에서 확인할 수 있습니다. 귀하가 타사 결제 계정을 결제 수단으로 사용하여 Netflix에 가입한 경우, 구독을 해지하려면 해당 타사를 통해서 해지(예를 들어, 해당 타사 결제 계정에 접속해 자동 갱신을 해제하거나 해당 타사를 통해 Netflix 서비스 구독을 해지하는 등)해야 할 수도 있습니다.
-2.7. 환불 요청. 귀하가 결제일로부터 7일 이내에 Netflix 구독을 해지하고 그동안 해당 계정으로 Netflix 콘텐츠를 이용하지 않는 경우, 귀하는 해당 결제 주기에 청구된 구독 요금을 전액 환불 요청할 수 있습니다.
-2.8. 요금 및 구독 요금제 변경. Netflix는 서비스 요금 및 구독 요금제를 변경할 수 있습니다. Netflix는 서비스 요금 및 구독 요금제의 변경에 대하여 적용 시기 등을 포함하여 귀하에게 통지하여 동의를 받습니다. 귀하는 해당 변경에 동의하지 않는 경우 Netflix 구독을 해지할 수 있습니다.
-3. 추가 회원
-3.1. 추가 회원 계정 생성. 계정 소유자의 구독 요금제에서 허용되는 경우, 계정 소유자는 추가 회원 계정을 구매하여 계정 소유자의 가구 구성원이 아닌 개인(‘추가 회원’)이 본 이용 약관의 적용을 받으며 계정 소유자의 구독 하에서 Netflix 서비스를 이용하도록 승인할 수 있습니다. 추가 회원 계정 관련 구독 요금은 계정 소유자의 결제 수단으로 청구됩니다. 추가 회원은 계정 소유자가 계정을 생성한 국가에서만 추가 회원 계정을 활성화할 수 있습니다.
-3.2. 추가 회원 계정의 해지 또는 수혜자 변경. 추가 회원은 언제든지 자신의 계정을 해지할 수 있으며, 추가 회원이 해지하는 경우 Netflix 서비스에 대한 추가 회원의 접근 권한은 즉시 상실됩니다. 계정 소유자는 언제든지 단독 재량으로 자신의 구독에서 추가 회원 기능을 삭제하거나 추가 회원으로 등록된 자를 변경할 수 있습니다. 계정 소유자가 자신의 구독에서 추가 회원 기능을 제거하는 경우, 추가 회원은 계정 소유자의 현재 결제 주기가 종료될 때까지 Netflix 서비스를 이용할 수 있습니다. 계정 소유자가 추가 회원 계정의 수혜자를 변경하는 경우, 기존 수혜자의 Netflix 서비스 이용은 즉시 종료됩니다. Netflix 서비스 이용을 계속하고자 하는 추가 회원은 ‘계정’ 페이지를 통해 추가 회원 계정을 일반 구독으로 업그레이드할 수 있습니다.
-4. 계정 액세스. Netflix 계정을 통해 발생하는 모든 활동에 대한 책임은 귀하에게 있습니다. 귀하가 타인에게 계정에 액세스할 수 있도록 허용하는 경우(해당 계정의 시청 기록 관련 정보에 대한 액세스 포함), 귀하는 해당 타인이 귀하를 대신하고 있으며 그 타인이 취하는 계정에 대한 모든 변경 사항(구독 요금제 변경 포함)에 귀하가 구속된다는 데에 동의하는 것으로 간주됩니다. 계정해킹, 명의도용, 신용카드 부정사용이나 기타 이에 준하는 사기행위 또는 불법행위로부터 귀하, Netflix 또는 제3자 등을 보호하기 위해 Netflix는 귀하의 계정을 해지하거나 그 이용을 정지할 수 있습니다.
-5. 보증 및 책임의 제한. Netflix는 안정적인 서비스 제공을 위해 노력합니다. 다만, Netflix의 책임 없이 서비스 중단이나 오류가 발생할 수 있습니다. Netflix는 고의 또는 과실로 인하여 귀하가 입은 손해를 배상하되, 특별한 사정으로 통상적인 범위를 벗어나는 손해는 Netflix의 고의 또는 중대한 과실을 제외하고는 책임지지 않습니다.
-6. 기타
-6.1. 준거법. 본 이용 약관은 대한민국 법률의 적용을 받고 그에 따라 해석됩니다.
-6.2. 불원 자료. Netflix는 Netflix 콘텐츠와 관련된 불원 자료 또는 아이디어를 인정하지 않으며, Netflix 콘텐츠 또는 다른 미디어상의 프로그램과 Netflix에 전송된 자료 또는 아이디어의 유사성에 대해 책임지지 않습니다.
-6.3. 고객 센터. Netflix 서비스 및 기능에 대한 추가 정보를 확인하거나 계정 관련 도움이 필요한 경우, netflix.com을 통해 이용 가능한 Netflix 고객 센터를 방문하시기 바랍니다. 특정 상황에서는 귀하의 컴퓨터에 대한 전체 액세스 권한을 고객 센터에 제공하는 원격 액세스 지원 도구를 사용하여 귀하를 지원하는 것이 최선일 수 있습니다. 이러한 액세스 권한을 제공하기를 원하지 않는 경우, 원격 액세스 도구를 통한 지원에 동의하지 않으시면 됩니다. 이 경우 고객 센터에서는 다른 수단을 사용해서 지원 서비스를 제공합니다. 본 이용 약관과 고객 센터 또는 Netflix 웹사이트 내 다른 부분에서 제공되는 내용 사이에 불일치가 존재하는 경우, 본 이용 약관이 우선적으로 적용됩니다.
-6.4. 본 약관의 변경 및 양도. Netflix는 수시로 본 이용 약관을 변경할 수 있습니다. 중대한 변경 사항이 있는 경우, Netflix는 해당 변경 사항이 귀하에게 적용되기 최소 1개월 전에 귀하에게 통지합니다. Netflix는 귀하와의 계약(관련 권리 및 의무 포함)을 관련 법률에서 정한 절차에 따라 양도 또는 이전할 수 있으며, 귀하는 이에 동의하지 않는 경우 언제라도 Netflix 멤버십을 해지할 수 있습니다.
-6.5. 전자적 커뮤니케이션. Netflix는 귀하의 계정과 관련한 정보(예: 결제 승인, 청구서, 연락처 정보 또는 결제 수단 변경, 확인 메시지, 공지)를 전자적 형태로만 제공합니다.
-마지막 업데이트: 2026년 4월 10일
+참조 URL: https://help.netflix.com/legal/termsofuse
+
+Help Center
+Join Netflix
+Sign In
+Wait times for chat support are longer than usual right now
+Check back later, or search our Help Center for answers.
+Back to Help Home
+Print
+Netflix Terms of Use
+
+Welcome to Netflix! Netflix provides a service that allows users to access entertainment content ("Netflix content") over the Internet on certain Internet-connected TVs, computers and other devices ("Netflix supported devices").
+
+These Terms of Use govern your use of our service. As used in these Terms of Use, "Netflix service", "our service" or "the service" means the service provided by Netflix for discovering and accessing Netflix content. This includes all personalization, features and functionalities, recommendations and reviews, our websites, applications and user interfaces, as well as all content and software associated with our service.
+
+1. The Netflix Service
+
+1.1. Access to the Netflix Service. To use the Netflix service you must have Internet access and a Netflix supported device. Some features, content, or offerings may be available at no cost and may be accessed without creating an account or providing a Payment Method, while other options require you to create a Netflix account or purchase a subscription, subject to the subscription terms outlined below. You may also be able to use the Netflix service as a profile user under an Account Owner’s subscription, provided you are part of the same household, or as an Extra Member if you do not live in the same household as the Account Owner. As used in these Terms, “Account Owner” means the user who created the Netflix account and whose Payment Method is charged for the subscription.
+
+1.2. Age Limitation. You must be at least 19 years of age to create a Netflix account or to become an Extra Member. Minors may only use the service under the supervision of an adult.
+
+1.3. Offers. We may from time to time provide special promotional offers (such as sweepstakes, discounts and other incentives), plans or subscriptions (“Offers”). Offer eligibility is determined by Netflix at its sole discretion and we reserve the right to revoke an Offer and put your account on hold in the event that we determine you are not eligible. Members of households with an existing or recent Netflix account may not be eligible for certain introductory Offers. We may use information such as device ID, method of payment or your contact information to determine Offer eligibility. The eligibility requirements and other limitations and conditions will be disclosed when you sign-up for the Offer or in other communications made available to you.
+
+1.4. Account Sharing. The Netflix service and any content accessed through it are for your personal, non-commercial use only and may not be shared with anyone outside of your household unless otherwise you purchased an Extra Member account.
+
+1.5. Access Limitations. You may access the Netflix content primarily within the country in which you have established your account and only in geographic locations where we offer your subscription plan and have licensed such content. The content that may be available will vary by geographic location, may be limited by law or by the rights that our third-party content providers grant to us, and will change from time to time. Not all Netflix content may be available in the ad supported subscription plan. The number of devices on which you may simultaneously watch depends on your chosen subscription plan and is specified on the "Account" page.
+
+1.6. Availability and Testing. The Netflix service, including the Netflix content, is regularly updated. In addition, we continually test various aspects of our service, including our websites, user interfaces and promotional features. You can turn off test participation at any time by visiting the "Account" page and changing the "Test participation" settings.
+
+1.7. Downloading Content. Depending on the subscription plan, some Netflix content may be available for temporary download and offline viewing on certain supported devices ("Offline Titles"). Limitations apply, including restrictions on the number of Offline Titles per account, the maximum number of devices that can contain Offline Titles, the time period within which you will need to begin viewing Offline Titles and how long the Offline Titles will remain accessible. Some Offline Titles may not be playable in certain countries and if you go online in a country where you would not be able to stream that Offline Title, the Offline Title will not be playable while you are in that country.
+
+1.8. Usage Rights and Restrictions. Subject to these Terms and only to the extent you are expressly authorised, we grant you a limited, non-exclusive, non-transferable right to access the Netflix service. Except for the foregoing, no right, title or interest shall be transferred to you. You agree to use the Netflix service, including all features and functionalities associated therewith, in accordance with all applicable laws, rules and regulations, or other restrictions on use of the service or content therein. Unless otherwise explicitly authorized, you agree not to:
+
+(i) use the service for commercial purposes or public performances;
+
+(ii) archive, reproduce, distribute, modify, display, perform, publish, license, create derivative works from, offer for sale, or use content and information contained on or obtained from or through the Netflix service;
+
+(iii) circumvent, remove, alter, deactivate, degrade, block, obscure or thwart any of the content protections or other elements of the Netflix service including the graphical user interface, any advertising or advertising features, copyright notices, and trademarks;
+
+(iv) use any robot, spider, scraper or other automated means to access the Netflix service;
+
+(v) decompile, reverse engineer or disassemble any software or other products or processes accessible through the Netflix service;
+
+(vi) insert any code or product or manipulate the content of the Netflix service in any way;
+
+(vii) use any data mining, data gathering or extraction method;
+
+(viii) upload, post, e-mail or otherwise send or transmit any material designed to interrupt, destroy or limit the functionality of any computer software or hardware or telecommunications equipment associated with the Netflix service, including any software viruses or any other computer code, files or programs; or
+
+(ix) engage in any of the foregoing in connection with the use, creation, development, modification, prompting, fine-tuning, training, testing, benchmarking or validation of any machine learning tool, model, system, algorithm, product or other technology.
+
+We may terminate or restrict your use of our service if you violate Section 1.2 (Age Limitation), 1.4 (Account Sharing), 1.5 (Access Limitations), 1.8 (Usage Rights and Restrictions) or 1.10 (Netflix Software and Updates) of these Terms of Use or are engaged in piracy, identity theft, unauthorized credit card use, or other similar fraudulent or illegal activity.
+
+1.9. Viewing Experience and Technical Requirements. The quality of the display of the Netflix content may vary from device to device, and may be affected by a variety of factors, such as your location, the bandwidth available through and/or speed of your Internet connection. HD, Ultra HD and HDR availability is subject to your Internet service and device capabilities. Spatial audio quality is subject to your device capabilities. Not all content is available in spatial audio or in all formats, such as HD, Ultra HD or HDR and not all subscription plans allow you to receive content in all formats. The minimum connection speed for HD video quality (defined as a resolution of 720p or higher) is 3.0 Mbps per stream; however, we recommend a faster connection for improved video quality. A connection speed of at least 5.0 Mbps per stream is recommended to receive Full HD video quality (defined as a resolution of 1080p or higher). A connection speed of at least 15.0 Mbps per stream is recommended to receive Ultra HD video quality (defined as a resolution of 4K or higher). You are responsible for all Internet access charges. Please check with your Internet provider for information on possible Internet data usage charges. The time it takes to begin watching Netflix content will vary based on a number of factors, including your location, available bandwidth at the time, the content you have selected and the configuration of your Netflix supported device.
+
+1.10. Netflix Software and Updates. The Netflix software is developed by, or for, Netflix and may solely be used for authorized access to Netflix content through Netflix supported devices. This software may vary by device and medium, and functionalities and features may also differ between devices. You acknowledge that the use of the service may require third party software that is subject to third party licenses. You agree that you may automatically receive updated versions of Netflix and related third-party software.
+
+1.11. Interactive Features. We may offer certain Interactive Features as part of the service. “Interactive Features” means any real-time or near-real-time functionality that enables users to participate in or interact with programming or other users, for example live chat, polls, voting, multiplayer gaming, game shows, and live voting. Use of Interactive Features is subject to these Terms of Use, our Community Guidelines and, where posted, the official rules for the specific event. We may record or retain participation records and take interim measures (for example, suspend voting, disqualify entries or void results) to protect voting integrity, safety or legal compliance. We may suspend or terminate access to any Interactive Feature immediately if you breach these Terms of Use, our policies, or if your use poses an immediate safety or legal risk.
+
+2. Subscription Terms
+
+2.1. Billing Cycle and Payment Terms. Your Netflix subscription will continue until terminated. To purchase a subscription, you will need to add one or more Payment Methods to your account. "Payment Method" means a current, valid, accepted method of payment, as may be updated from time to time and which may include payment through your account with a third party. Unless you cancel your subscription before your billing date, you authorize us to charge the subscription fee for the next billing cycle to your Payment Method (see "Cancellation" below). The subscription fee and any other charges you may incur in connection with your use of the service, such as taxes and possible transaction fees, will be charged to your Payment Method on the specific payment date indicated on the "Account" page. The length of your billing cycle will depend on the type of subscription plan that you choose when you signed up for the service. In some cases your payment date may change, for example if your Payment Method has not successfully settled, when you change your subscription plan or if your paid subscription began on a day not contained in a given month. You can see your next payment date on the “Account” page. If you signed up for Netflix using your account with a third party as a Payment Method, you can find the billing information about your Netflix subscription by visiting your account with the applicable third party.
+
+2.2. Payment Methods. You authorize us to charge any Payment Method associated with your account in case your primary Payment Method is declined or no longer available to us for payment of your subscription fee. You remain responsible for any uncollected amounts. If a payment is not successfully settled, due to expiration, insufficient funds, or otherwise, and you do not cancel your subscription, we may suspend your access to the service until we have successfully charged a valid Payment Method. For some Payment Methods, the issuer may charge you certain fees, such as foreign transaction fees or other fees relating to the processing of your Payment Method. Local tax charges may vary depending on the Payment Method used. Check with your Payment Method service provider for details.
+
+2.3. Updating your Payment Methods. You can update your Payment Methods through the "Account" page. We may also update your Payment Methods using information provided by the payment service providers. Following any update, you authorize us to continue to charge the applicable Payment Method(s).
+
+2.4. Subscription Plans With or Without Advertisements. We may offer a number of subscription plans, including plans with or without advertisements. Our ad-free subscription plans are designed to provide an experience without commercial interruptions. However, there may be some occasions when you may see advertisements — for example, during certain live or special events (including replays), as part of linear programming, or where required by streaming rights or other legal or contractual obligations. In addition, all subscription plans may contain limited commercial content, such as branded content or sponsorship messaging, promotions for Netflix content or information about other Netflix products or services. Netflix does not endorse or sponsor any advertised third party products or services and any interactions with advertisers, including through engagement with interactive advertisements, are at your own option and risk.
+
+2.5. Subscriptions Obtained Through Third Parties. Some subscriptions are offered by third parties in conjunction with the provision of their own products and services. These subscription plans may have differing conditions and limitations, which will be disclosed prior to your sign-up or in other communications made available to you.
+
+2.6. Cancellation. You can cancel your Netflix subscription at any time. To cancel, go to the "Account" page and follow the cancellation instructions. The cancellation will take effect at the end of the billing period, except when a cancellation is requested as per Section 2.7, in which case your subscription will end immediately. Except for cancellations that meet the requirements set forth in Section 2.7 or refund obligations due to Netflix’s willful misconduct or negligence, we do not provide refunds or credits for any partial subscription periods or unused Netflix content. You can see when your subscription will end on the "Account" page. If you signed up for Netflix using your account with a third party as a Payment Method and wish to cancel your Netflix subscription, you may need to do so through such third party, for example by visiting your account with the applicable third party and turning off auto-renew, or unsubscribing from the Netflix service through that third party.
+
+2.7. Refund Requests. If you cancel your subscription within seven (7) calendar days from your billing date and no Netflix content is accessed through the account, you can request a full refund of your subscription fee that was charged for that billing cycle.
+
+2.8. Changes to the Price and Subscription Plans. We may change the price of our service and subscription plans. We will notify you about when the price change and any other change to your subscription plan will take effect, and obtain your consent. You may cancel your Netflix subscription if you do not consent to such change(s).
+
+3. Extra Members
+
+3.1. Creation of an Extra Member Account. Where permitted by the Account Owner’s subscription plan, the Account Owner may purchase an Extra Member account, authorising a person outside of the Account Owner’s household (the “Extra Member”) to access the Netflix service under the Account Owner’s subscription and subject to these Terms of Use. The subscription fees related to the Extra Member account will be charged to the Account Owner’s Payment Method. Extra Members may activate their Extra Member account only in the country where the Account Owner created their account.
+
+3.2. Cancellation or Changing Beneficiary of the Extra Member Account. An Extra Member may cancel their account at any time; cancellation by the Extra Member will result in the Extra Member’s immediate loss of access to the Netflix service. The Account Owner may also, in their sole discretion and at any time, remove the Extra Member feature from their subscription or change its beneficiary. If the Account Owner removes the Extra Member feature from their subscription, the Extra Member will retain access to the Netflix service until the end of the Account Owner’s running billing period. If the Account Owner changes the beneficiary of the Extra Member account, the previous beneficiary’s access to the Netflix service will end immediately. An Extra Member who wishes to continue using the service, can upgrade their Extra Member account to a subscription via the “Account” page.
+
+4. Account Access. You are responsible for any activity that occurs through the Netflix account. By allowing others to access the account (which includes access to information on viewing activity for the account), you agree that such individuals are acting on your behalf and that you are bound by any changes that they may make to the account, including changes to the subscription plans. We can terminate your account or place your account on hold in order to protect you, Netflix or others from account hacking, identity theft, unauthorized credit card use, or other similar fraudulent or illegal activity.
+
+5. Warranties and Limitations on Liability. Netflix will endeavor to provide a stable service. However, our service may be interrupted or subject to errors without any liability of Netflix. Netflix is only liable for damages arising from Netflix’s willful misconduct or negligence. Netflix is not liable for damages that exceed the ordinary scope due to special circumstances, except where such damages arise due to Netflix’s willful misconduct or gross negligence.
+
+6. Miscellaneous
+
+6.1. Governing Law. These Terms of Use shall be governed by and construed in accordance with the laws of the Republic of Korea.
+
+6.2. Unsolicited Materials. Netflix does not accept unsolicited materials or ideas for Netflix content, and is not responsible for the similarity of any of its content or programming in any media to materials or ideas transmitted to Netflix.
+
+6.3. Customer Support. To find more information about our service and its features or if you need assistance with your account, please visit the Netflix Help Center, which is accessible through netflix.com. In certain instances, Customer Service may best be able to assist you by using a remote access support tool through which we have full access to your computer. If you do not want us to have this access, you should not consent to support through the remote access tool, and we will assist you through other means. In the event of any conflict between these Terms of Use and information provided by Customer Support or other portions of our websites, these Terms of Use will control.
+
+6.4. Changes to these Terms and Assignment. We may, from time to time, change these Terms of Use. In case of material changes we will notify you at least one month before such changes apply to you. We may assign or transfer our agreement with you including our associated rights and obligations pursuant to the process required under applicable law, and if you do not consent, you may cancel your membership at any time.
+
+6.5. Electronic Communications. We will send you information relating to your account (e.g., payment authorizations, invoices, changes in contact details or Payment Method, confirmation messages, notices) in electronic form only.
+
+Last Updated: April 10, 2026
+
+SELECT YOUR PREFERRED LANGUAGE:
+Select a language
+English
+Korean
+Terms of Use
+Privacy
+Cookie Preferences
+Corporate Information

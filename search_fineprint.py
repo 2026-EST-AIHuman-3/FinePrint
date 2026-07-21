@@ -4,8 +4,8 @@
 1. 서비스명으로 이용약관, 개인정보 처리방침, 환불·해지 정책,
    자동결제 정책 후보를 검색합니다.
 2. 허용된 공식 도메인과 최종 리디렉션 주소를 검증해 기사·블로그를 차단합니다.
-3. 현재 공식 페이지에서 개정일을 추출하고, 이용약관은 개정일이 있을 때만 저장합니다.
-4. 웹 페이지, PDF, TXT를 텍스트로 변환해 검증된 이용약관 원문만 저장합니다.
+3. 현재 공식 페이지에서 개정일을 추출하고, 이용약관과 개인정보처리방침을 각각 검증합니다.
+4. 검증된 원문을 RAG/terms/<서비스명>/terms.txt, privacy.txt로 저장합니다.
 
 이 파일은 FinePrint의 "문서 탐색·인입·전처리" 단계입니다.
 
@@ -16,9 +16,9 @@
     python -m playwright install chromium
 
 실행 예시
-    python search_tos_fineprint.py
-    python search_tos_fineprint.py --service "넷플릭스"
-    python search_tos_fineprint.py --service "다른 서비스"
+    python search_fineprint.py
+    python search_fineprint.py --service "넷플릭스"
+    python search_fineprint.py --service "다른 서비스"
 """
 
 from __future__ import annotations
@@ -848,14 +848,15 @@ def is_safe_terms_candidate_url(url: str) -> bool:
     )
 
 
-def verify_terms_candidate(
+def verify_policy_candidate(
     service_name: str,
     candidate: Candidate,
+    document_type: str,
     allowed_domains: tuple[str, ...] = (),
     client: TavilyClient | None = None,
     user_provided: bool = False,
 ) -> Candidate | None:
-    """검색 결과를 바로 믿지 않고, 실제 이용약관 본문을 얻은 뒤에만 후보로 인정한다.
+    """검색 결과를 바로 믿지 않고, 실제 정책 본문을 얻은 뒤에만 후보로 인정한다.
 
     검증 순서는 URL 안전성 → 최종 리디렉션 도메인 → 약관 조항 구조 → 서비스명 표기다.
     따라서 기사 제목에 서비스명이 들어 있거나 SNS 계정이 '공식'으로 보이는 경우는 통과하지 않는다.
@@ -866,7 +867,7 @@ def verify_terms_candidate(
         return None
 
     text, source_kind, final_url = extract_web_document(candidate.url)
-    if client and (not text or not content_looks_like_policy(text, "terms")):
+    if client and (not text or not content_looks_like_policy(text, document_type)):
         tavily_text, tavily_kind, tavily_final_url = extract_tavily_document(client, candidate.url)
         if tavily_text:
             text, source_kind, final_url = tavily_text, tavily_kind, tavily_final_url
@@ -877,54 +878,63 @@ def verify_terms_candidate(
     if not is_official_url(final_url, effective_domains):
         logging.info("Final URL left the trusted domain: %s -> %s", candidate.url, final_url)
         return None
-    if looks_like_news_article(text) or not content_looks_like_policy(text, "terms"):
+    if looks_like_news_article(text) or not content_looks_like_policy(text, document_type):
         return None
     if not user_provided and not document_mentions_service(service_name, candidate.title, text):
         logging.info("Terms text does not identify the requested service: %s", final_url)
         return None
 
     candidate.url = normalize_url(candidate.url)
-    candidate.detected_type = "terms"
-    candidate.requested_type = "terms"
+    candidate.detected_type = document_type
+    candidate.requested_type = document_type
     candidate.official_domain = True
     candidate.validated_text = normalize_text(text)
     candidate.validated_source_kind = source_kind
     candidate.validated_final_url = normalize_url(final_url)
     candidate.score = max(candidate.score, 0) + 500
     reasons = list(candidate.reasons)
-    reasons.extend(["verified-terms-body:+500", "final-domain:verified"])
+    reasons.extend([f"verified-{document_type}-body:+500", "final-domain:verified"])
     if extract_revision_date(candidate.validated_text) or has_current_terms_marker(candidate.validated_text):
         candidate.score += 40
         reasons.append("current-marker:+40")
-    if url_has_document_keyword(candidate.url, "terms"):
+    if url_has_document_keyword(candidate.url, document_type):
         candidate.score += 30
-        reasons.append("terms-url:+30")
+        reasons.append(f"{document_type}-url:+30")
     candidate.reasons = tuple(dict.fromkeys(reasons))
     return candidate
 
 
-def search_verified_terms_candidates(
+def search_verified_policy_candidates(
     client: TavilyClient,
     service_name: str,
+    document_type: str,
     trusted_domains: tuple[str, ...] = (),
     max_results: int = DEFAULT_MAX_RESULTS,
 ) -> list[Candidate]:
-    """약관 검색과 본문 검증을 하나의 단계로 수행한다.
+    """정책 검색과 본문 검증을 하나의 단계로 수행한다.
 
     기존처럼 먼저 '공식 홈페이지' 도메인을 추측하지 않는다. 이용약관 후보를 여러 방식으로
     찾고, 각 후보의 실제 본문을 검증한 뒤 통과한 문서의 최종 도메인만 공식 출처로 확정한다.
     """
-    queries = (
-        f'"{service_name}" 이용약관',
-        f'"{service_name}" 공식 이용약관',
-        f'"{service_name}" "terms of use"',
-        f'"{service_name}" "terms of service"',
-    )
+    if document_type == "privacy":
+        queries = (
+            f'"{service_name}" 개인정보처리방침',
+            f'"{service_name}" 개인정보 보호정책',
+            f'"{service_name}" "privacy policy"',
+        )
+    else:
+        queries = (
+            f'"{service_name}" 이용약관',
+            f'"{service_name}" 공식 이용약관',
+            f'"{service_name}" "terms of use"',
+            f'"{service_name}" "terms of service"',
+        )
     raw_candidates: dict[str, Candidate] = {}
 
     # 이미 검증한 서비스의 고정 약관 URL은 검색 결과보다 먼저 확인한다.
     for item in canonical_policy_candidates(service_name, trusted_domains):
-        raw_candidates[item.url] = item
+        if item.detected_type == document_type:
+            raw_candidates[item.url] = item
 
     search_succeeded = False
     for query in queries:
@@ -949,14 +959,14 @@ def search_verified_terms_candidates(
             title = (result.get("title") or "").strip()
             snippet = (result.get("content") or "").strip()
             evidence = compact_text(f"{url} {title} {snippet}")
-            if not any(compact_text(word) in evidence for word in DOCUMENT_KEYWORDS["terms"]):
+            if not any(compact_text(word) in evidence for word in DOCUMENT_KEYWORDS[document_type]):
                 continue
             item = Candidate(
                 url=url,
                 title=title,
                 snippet=snippet,
-                requested_type="terms",
-                detected_type="terms",
+                requested_type=document_type,
+                detected_type=document_type,
                 score=max(0, 40 - rank * 4),
             )
             previous = raw_candidates.get(url)
@@ -970,7 +980,13 @@ def search_verified_terms_candidates(
     # 도메인별 최고 검증 문서만 남긴다. 같은 사이트의 중복·낮은 품질 페이지를 제거한다.
     per_domain: dict[str, Candidate] = {}
     for candidate in raw_candidates.values():
-        verified = verify_terms_candidate(service_name, candidate, trusted_domains, client)
+        verified = verify_policy_candidate(
+            service_name,
+            candidate,
+            document_type,
+            trusted_domains,
+            client,
+        )
         if not verified:
             continue
         domain = registrable_domain(urlparse(verified.validated_final_url).netloc)
@@ -1063,16 +1079,17 @@ def make_document(
     )
 
 
-def save_terms(
+def save_policy_document(
     base_dir: Path,
     service_name: str,
-    terms_document: CollectedDocument,
+    document: CollectedDocument,
 ) -> Path:
-    """검증된 공식 이용약관 원문 한 건만 terms.txt로 저장한다."""
+    """검증된 공식 이용약관·개인정보처리방침 원문을 각각 정해진 파일명으로 저장한다."""
     output_dir = base_dir / "RAG" / "terms" / safe_service_name(service_name)
     output_dir.mkdir(parents=True, exist_ok=True)
-    output_path = output_dir / "terms.txt"
-    output_path.write_text(terms_document.text, encoding="utf-8")
+    filename = "privacy.txt" if document.document_type == "privacy" else "terms.txt"
+    output_path = output_dir / filename
+    output_path.write_text(document.text, encoding="utf-8")
     return output_path
 
 
@@ -1084,14 +1101,15 @@ def print_candidates(candidates: list[Candidate], limit: int = 20) -> None:
         print(f"      {item.title} | {reasons}")
 
 
-def prompt_for_terms_url(reason: str | None = None) -> str | None:
-    """어느 자동 단계에서든 실패하면 사용자가 이용약관 URL을 직접 제공할 수 있게 한다."""
+def prompt_for_policy_url(document_type: str, reason: str | None = None) -> str | None:
+    """어느 자동 단계에서든 실패하면 사용자가 정책 URL을 직접 제공할 수 있게 한다."""
     if reason:
         print(reason)
-    answer = input("이용약관 페이지의 URL을 복사해서 입력하시겠습니까? (y/n): ").strip().lower()
+    label = "개인정보처리방침" if document_type == "privacy" else "이용약관"
+    answer = input(f"{label} 페이지의 URL을 복사해서 입력하시겠습니까? (y/n): ").strip().lower()
     if answer not in {"y", "yes", "예", "네"}:
         return None
-    url = input("이용약관 페이지의 URL을 복사해서 입력해주세요: ").strip()
+    url = input(f"{label} 페이지의 URL을 복사해서 입력해주세요: ").strip()
     if not url.startswith(("https://", "http://")):
         print("http:// 또는 https://로 시작하는 URL을 입력해주세요.")
         return None
@@ -1101,43 +1119,48 @@ def prompt_for_terms_url(reason: str | None = None) -> str | None:
 def request_verified_manual_candidate(
     service_name: str,
     client: TavilyClient | None,
+    document_type: str,
     reason: str,
 ) -> Candidate | None:
-    """사용자 제공 URL도 추출·리디렉션·약관 본문 검증을 거쳐서만 저장 후보로 만든다."""
+    """사용자 제공 URL은 공식성·문서 유형을 판정하지 않고 본문만 그대로 가져온다."""
+    label = "개인정보처리방침" if document_type == "privacy" else "이용약관"
     for attempt in range(2):
-        url = prompt_for_terms_url(reason if attempt == 0 else "입력한 URL에서 이용약관 본문을 확인하지 못했습니다.")
+        retry_reason = f"입력한 URL에서 내용을 가져오지 못했습니다: {label}"
+        url = prompt_for_policy_url(document_type, reason if attempt == 0 else retry_reason)
         if not url:
             return None
-        domain = registrable_domain(urlparse(url).netloc)
-        candidate = Candidate(
-            url=url,
-            title=f"{service_name} 사용자 제공 이용약관",
-            snippet="",
-            requested_type="terms",
-            detected_type="terms",
-            canonical_source=True,
-            score=900,
-        )
-        verified = verify_terms_candidate(
-            service_name,
-            candidate,
-            (domain,),
-            client,
-            user_provided=True,
-        )
-        if verified:
-            print(f"사용자 제공 이용약관 URL을 확인합니다: {verified.validated_final_url}")
-            return verified
-        logging.warning("Manual terms URL verification failed: %s", url)
+        text, source_kind, final_url = extract_web_document(url)
+        if client and not text:
+            tavily_text, tavily_kind, tavily_final_url = extract_tavily_document(client, url)
+            if tavily_text:
+                text, source_kind, final_url = tavily_text, tavily_kind, tavily_final_url
+        if normalize_text(text):
+            candidate = Candidate(
+                url=url,
+                title=f"{service_name} 사용자 제공 {label}",
+                snippet="",
+                requested_type=document_type,
+                detected_type=document_type,
+                canonical_source=True,
+                official_domain=True,  # 사용자가 직접 지정한 출처임을 표시한다.
+                score=900,
+                reasons=("user-provided-url",),
+                validated_text=normalize_text(text),
+                validated_source_kind=source_kind,
+                validated_final_url=normalize_url(final_url or url),
+            )
+            print(f"사용자 제공 URL의 내용을 가져옵니다: {candidate.validated_final_url}")
+            return candidate
+        logging.warning("Manual URL extraction failed: %s", url)
     return None
 
 
-def make_terms_document_from_candidate(
+def make_policy_document_from_candidate(
     service_name: str,
     candidate: Candidate,
     args: argparse.Namespace,
 ) -> CollectedDocument | None:
-    """검증 완료 후보를 저장용 이용약관 문서로 변환한다."""
+    """검증 완료 후보를 저장용 정책 문서로 변환한다."""
     text = candidate.validated_text
     if not text:
         return None
@@ -1152,10 +1175,27 @@ def make_terms_document_from_candidate(
     if not revision_date and not args.allow_undated:
         logging.info("Skipping undated verified terms page: %s", candidate.validated_final_url)
         return None
+    # 직접 입력 URL은 내용의 길이·정책 형식을 추가로 판정하지 않고 원문을 그대로 저장한다.
+    if is_manual:
+        normalized = normalize_text(text)
+        return CollectedDocument(
+            service_name=service_name,
+            document_type=candidate.detected_type,
+            title=candidate.title,
+            source_url=candidate.validated_final_url or candidate.url,
+            source_kind=candidate.validated_source_kind or "web_unknown",
+            official_domain=True,
+            revision_date=revision_date,
+            selection_score=candidate.score,
+            collected_at=datetime.now(timezone.utc).isoformat(),
+            sha256=hashlib.sha256(normalized.encode("utf-8")).hexdigest(),
+            text=normalized,
+            chunks=split_into_chunks(normalized, args.chunk_size, args.chunk_overlap),
+        )
     return make_document(
         service_name,
-        "terms",
-        candidate.title or "이용약관",
+        candidate.detected_type,
+        candidate.title or ("개인정보처리방침" if candidate.detected_type == "privacy" else "이용약관"),
         candidate.validated_final_url or candidate.url,
         candidate.validated_source_kind or "web_unknown",
         True,
@@ -1187,13 +1227,13 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--allow-undated",
         action="store_true",
-        help="개정일이 표시되지 않은 공식 이용약관도 저장할 때만 사용",
+        help="개정일이 표시되지 않은 공식 정책 문서도 저장할 때만 사용",
     )
     return parser.parse_args()
 
 
 def main() -> int:
-    """약관 후보 검색 → 실제 본문 검증 → 이용약관 원문 저장의 전체 흐름."""
+    """이용약관·개인정보처리방침 검색 → 실제 본문 검증 → 원문 저장의 전체 흐름."""
     args = parse_args()
     base_dir = Path(__file__).resolve().parent
     configure_logging(base_dir)
@@ -1213,112 +1253,93 @@ def main() -> int:
     except RuntimeError as error:
         print(f"Tavily 검색은 생략합니다: {error}")
 
-    # 핵심 변경: 홈페이지를 먼저 추측하지 않는다. 실제 약관 원문을 검증한 후보만 남긴다.
-    candidates: list[Candidate] = []
-    if client:
-        candidates = search_verified_terms_candidates(
-            client,
-            service_name,
-            trusted_domains,
-            args.max_results,
-        )
+    policy_types = ("terms", "privacy")
+    labels = {"terms": "이용약관", "privacy": "개인정보처리방침"}
+    candidates_by_type: dict[str, list[Candidate]] = {}
 
-    if not candidates:
-        failure_reason = (
-            "자동 검색을 사용할 수 없습니다."
-            if client is None
-            else "자동 탐색 결과에서 본문·도메인·서비스명 검증을 모두 통과한 이용약관을 찾지 못했습니다."
+    # 홈페이지를 추측하지 않고, 실제 정책 원문을 검증한 후보만 각 유형별로 남긴다.
+    for document_type in policy_types:
+        candidates = (
+            search_verified_policy_candidates(
+                client, service_name, document_type, trusted_domains, args.max_results
+            )
+            if client
+            else []
         )
-        manual_candidate = request_verified_manual_candidate(service_name, client, failure_reason)
-        if not manual_candidate:
-            print("검증 가능한 이용약관 URL이 없어 저장하지 않습니다.")
-            return 1
-        candidates = [manual_candidate]
+        if not candidates:
+            reason = (
+                "자동 검색을 사용할 수 없습니다."
+                if client is None
+                else f"자동 탐색 결과에서 본문·도메인·서비스명 검증을 모두 통과한 {labels[document_type]}을 찾지 못했습니다."
+            )
+            manual = request_verified_manual_candidate(
+                service_name, client, document_type, reason
+            )
+            candidates = [manual] if manual else []
+        candidates_by_type[document_type] = candidates
 
-    confirmed_domains = tuple(
-        dict.fromkeys(registrable_domain(urlparse(item.validated_final_url).netloc) for item in candidates)
-    )
-    print(f"확인된 공식 도메인: {', '.join(confirmed_domains)}")
-    print(f"본문 검증을 통과한 이용약관 후보 {len(candidates)}건을 찾았습니다.")
+    all_candidates = [item for items in candidates_by_type.values() for item in items]
+    if all_candidates:
+        confirmed_domains = tuple(
+            dict.fromkeys(
+                registrable_domain(urlparse(item.validated_final_url).netloc)
+                for item in all_candidates
+            )
+        )
+        print(f"확인된 공식 도메인: {', '.join(confirmed_domains)}")
+    else:
+        print("검증 가능한 정책 URL이 없어 저장하지 않습니다.")
+        return 1
+
+    for document_type in policy_types:
+        print(f"본문 검증을 통과한 {labels[document_type]} 후보 {len(candidates_by_type[document_type])}건")
     if args.list:
-        print_candidates(candidates)
+        print_candidates(all_candidates)
         return 0
 
-    documents: list[CollectedDocument] = []
-    seen_hashes: set[str] = set()
+    saved_documents: dict[str, CollectedDocument] = {}
+    for document_type in policy_types:
+        candidates = candidates_by_type[document_type]
+        verified_documents = [
+            document
+            for candidate in candidates[: max(args.top_k, 0)]
+            if (document := make_policy_document_from_candidate(service_name, candidate, args))
+            and document.official_domain
+            and document.revision_date
+        ]
 
-    for candidate in candidates[: max(args.top_k, 0)]:
-        document = make_terms_document_from_candidate(service_name, candidate, args)
-        if document and document.sha256 not in seen_hashes:
-            documents.append(document)
-            seen_hashes.add(document.sha256)
-
-    # 웹 탐색이 실패했거나 특정 약관을 직접 지정한 경우 PDF/TXT를 함께 인입한다.
-    for document_path in args.document:
-        try:
-            text, source_kind = extract_local_document(document_path)
-            local_type = classify_document_type(document_path, Path(document_path).stem, text[:2000], "terms")
-            document = make_document(
+        # 본문은 찾았지만 개정일 등 저장 조건을 만족하지 못한 경우에도 직접 URL 입력을 한 번 더 제안한다.
+        if not verified_documents:
+            manual = request_verified_manual_candidate(
                 service_name,
-                local_type,
-                Path(document_path).name,
-                str(Path(document_path).resolve()),
-                source_kind,
-                False,
-                extract_revision_date(text),
-                0,
-                text,
-                args.chunk_size,
-                args.chunk_overlap,
+                client,
+                document_type,
+                f"자동 후보의 개정일 또는 본문 검증에 실패했습니다: {labels[document_type]}",
             )
-            if document and document.sha256 not in seen_hashes:
-                documents.append(document)
-                seen_hashes.add(document.sha256)
-        except Exception as error:
-            logging.exception("Local document ingestion failed: %s", document_path)
-            print(f"직접 문서 처리 실패: {document_path} ({error})")
+            if manual:
+                document = make_policy_document_from_candidate(service_name, manual, args)
+                if document and document.official_domain and document.revision_date:
+                    verified_documents = [document]
 
-    if not documents:
-        manual_candidate = request_verified_manual_candidate(
-            service_name,
-            client,
-            "자동 후보의 개정일 또는 본문 검증에 실패했습니다.",
-        )
-        if manual_candidate:
-            document = make_terms_document_from_candidate(service_name, manual_candidate, args)
-            if document:
-                documents.append(document)
-        if not documents:
-            print("본문을 확보한 이용약관이 없습니다. --document로 PDF/TXT를 직접 지정해 보세요.")
-            print_candidates(candidates, limit=10)
-            return 1
+        if verified_documents:
+            saved_documents[document_type] = max(
+                verified_documents, key=lambda document: document.selection_score
+            )
+        else:
+            print(f"{labels[document_type]}은 저장하지 못했습니다.")
 
-    official_terms = [
-        document for document in documents
-        if document.document_type == "terms"
-        and document.official_domain
-        and document.revision_date
-    ]
-    if not official_terms:
-        manual_candidate = request_verified_manual_candidate(
-            service_name,
-            client,
-            "개정일이 확인된 공식 이용약관을 찾지 못했습니다.",
-        )
-        if manual_candidate:
-            manual_document = make_terms_document_from_candidate(service_name, manual_candidate, args)
-            if manual_document:
-                official_terms = [manual_document]
-        if not official_terms:
-            print("개정일이 확인된 공식 이용약관 원문을 찾지 못해 저장하지 않습니다.")
-            return 1
+    if not saved_documents:
+        return 1
 
-    primary_terms = max(official_terms, key=lambda document: document.selection_score)
-    output_path = save_terms(base_dir, service_name, primary_terms)
-    print("수집 완료: 공식 이용약관 1개 문서")
-    print(f"저장 위치: {output_path}")
-    print(f"공식 이용약관: {primary_terms.source_url}")
-    print(f"문서 개정일: {primary_terms.revision_date}")
+    print(f"수집 완료: 공식 정책 문서 {len(saved_documents)}개")
+    for document_type in policy_types:
+        document = saved_documents.get(document_type)
+        if not document:
+            continue
+        output_path = save_policy_document(base_dir, service_name, document)
+        print(f"{labels[document_type]} 저장 위치: {output_path}")
+        print(f"원본 URL: {document.source_url}")
+        print(f"문서 개정일: {document.revision_date}")
     return 0
 
 
