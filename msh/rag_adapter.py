@@ -12,6 +12,7 @@ from Siyeong.search_utils import (
     hybrid_search,
     search_law_and_guideline,
 )
+from Siyeong.ensure_service_ingested import prepare_knowledge_base
 
 def format_search_results(results: list[dict]) -> str:
     if not results:
@@ -95,7 +96,15 @@ def retrieve_rag_context(
     service_name: str,
     user_question: str,
     improvement_instruction: str = "",
+    policy_urls: dict[str, str] | None = None,
 ) -> dict:
+    knowledge_base_status = prepare_knowledge_base(
+        service_name,
+        policy_urls=policy_urls,
+    )
+    canonical_service_name = str(
+        knowledge_base_status.get("service_name", service_name)
+    )
     query_parts = [user_question]
 
     if improvement_instruction:
@@ -108,7 +117,7 @@ def retrieve_rag_context(
         n_results=6,
         candidate_pool=20,
         doc_type="terms",
-        service_name=service_name,
+        service_name=canonical_service_name,
     )
 
     consumer_results = search_law_and_guideline(
@@ -119,10 +128,11 @@ def retrieve_rag_context(
 
     consumer_results = filter_other_service_examples(
         results=consumer_results,
-        current_service=service_name,
+        current_service=canonical_service_name,
     )[:3]
 
     return {
+        "knowledge_base_status": knowledge_base_status,
         "terms_context": format_search_results(terms_results),
         "consumer_protection_context": format_search_results(
             consumer_results

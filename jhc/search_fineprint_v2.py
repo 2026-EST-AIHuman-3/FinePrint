@@ -1,13 +1,13 @@
 """구독형 서비스의 공식 약관과 개인정보처리방침을 수집한다.
 
-1. 프로젝트 폴더로 이동
-cd /smhrd2/FinePrint/jhc
+1. FinePrint 프로젝트 루트로 이동
+cd /smhrd2/FinePrint
 
 2. Conda 환경 활성화
 conda activate fineprint311
 
 3. 실행
-python search_fineprint_v2.py
+python -m jhc.search_fineprint_v2
 
 설치:
     pip install tavily-python playwright trafilatura requests python-dotenv
@@ -19,14 +19,16 @@ API 키 입력:
 
 실행:
     # .env 파일 또는 환경 변수에 TAVILY_API_KEY를 설정한 뒤 실행
-    python search_fineprint_v2.py
-    python collect_subscription_policies.py
-    python collect_subscription_policies.py --service 넷플릭스
-    python collect_subscription_policies.py --service 넷플릭스 --official-domain netflix.com
+    python -m jhc.search_fineprint_v2
+    python -m jhc.search_fineprint_v2 --service 넷플릭스
+    python -m jhc.search_fineprint_v2 --service 넷플릭스 --official-domain netflix.com
+    python -m jhc.search_fineprint_v2 --service 넷플릭스 \
+        --terms-url https://help.netflix.com/ko/legal/termsofuse \
+        --privacy-url https://help.netflix.com/ko/legal/privacy
 
 저장 파일:
-    RAG/terms/<서비스명>/terms.txt
-    RAG/terms/<서비스명>/privacy.txt
+    <FinePrint 데이터 경로>/terms/<서비스명>/terms.txt
+    <FinePrint 데이터 경로>/terms/<서비스명>/privacy.txt
 
 각 파일은 첫 줄에 실제로 수집한 최종 참조 URL을 기록하고, 그 아래에는
 페이지에서 추출한 본문을 별도의 정규화·요약·번역 없이 저장한다.
@@ -44,6 +46,15 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Iterable
 from urllib.parse import urlparse
+
+
+PROJECT_ROOT = Path(__file__).resolve().parents[1]
+DEFAULT_DATA_ROOT = Path(
+    os.getenv(
+        "FINEPRINT_POLICY_DATA_PATH",
+        str(Path(__file__).resolve().parent / "RAG"),
+    )
+).expanduser().resolve()
 
 
 DOCUMENTS = {
@@ -428,6 +439,23 @@ def ask_manual_url(service_name: str, document_type: str, official_domain: str |
     return None
 
 
+def policy_from_user_url(url: str, document_type: str) -> ExtractedPage | None:
+    """UI/CLI에서 명시적으로 받은 공식 URL의 본문을 추출한다.
+
+    사용자가 문서 종류를 직접 지정했으므로 자동 검색용 키워드 판정은 적용하지
+    않는다. URL 형식과 실제 본문 추출 가능 여부만 확인한다.
+    """
+    candidate = url.strip()
+    if not candidate.startswith(("https://", "http://")):
+        print(f"{DOCUMENTS[document_type]['label']} URL 형식이 올바르지 않습니다: {url}")
+        return None
+    page = extract_page(candidate)
+    if page and page.text.strip():
+        return page
+    print(f"입력 URL에서 본문을 추출하지 못했습니다: {candidate}")
+    return None
+
+
 def policy_from_search(client, service_name: str, document_type: str, official_domain: str) -> ExtractedPage | None:
     """검색 URL을 하나씩 열고, 최종 리디렉션 URL까지 공식 도메인인지 검증한다."""
     for url in search_policy_urls(client, service_name, document_type, official_domain):
@@ -471,9 +499,9 @@ def safe_service_directory_name(service_name: str) -> str:
     return name or "unnamed_service"
 
 
-def save_policy(base_dir: Path, service_name: str, document_type: str, page: ExtractedPage) -> Path:
+def save_policy(data_root: Path, service_name: str, document_type: str, page: ExtractedPage) -> Path:
     """참조 URL과 원문을 UTF-8 텍스트 파일로 원자적으로 저장한다."""
-    output_dir = base_dir / "RAG" / "terms" / safe_service_directory_name(service_name)
+    output_dir = data_root / "terms" / safe_service_directory_name(service_name)
     output_dir.mkdir(parents=True, exist_ok=True)
     output_path = output_dir / DOCUMENTS[document_type]["filename"]
 
@@ -488,12 +516,110 @@ def save_policy(base_dir: Path, service_name: str, document_type: str, page: Ext
     return output_path
 
 
+def collect_service_policies(
+    service_name: str,
+    official_domain: str | None = None,
+    output_root: str | Path | None = None,
+    document_types: Iterable[str] = ("terms", "privacy"),
+    policy_urls: dict[str, str] | None = None,
+    allow_manual_url: bool = False,
+) -> list[Path]:
+    """서비스의 공식 정책을 수집하고 인제스트 대상 파일 경로를 반환한다.
+
+    Agent에서는 ``allow_manual_url=False``로 호출해 입력 대기 없이 실패를
+    반환하고, CLI에서는 True로 호출해 자동 탐색 실패 시 공식 URL을 받을 수 있다.
+    """
+    service_name = service_name.strip()
+    if not service_name:
+        raise ValueError("service_name은 빈 값일 수 없습니다.")
+
+    requested_types = tuple(dict.fromkeys(document_types))
+    invalid_types = [name for name in requested_types if name not in DOCUMENTS]
+    if invalid_types:
+        raise ValueError(f"지원하지 않는 문서 유형입니다: {invalid_types}")
+
+    explicit_urls = {
+        document_type: url.strip()
+        for document_type, url in (policy_urls or {}).items()
+        if url and url.strip()
+    }
+    invalid_url_types = [name for name in explicit_urls if name not in DOCUMENTS]
+    if invalid_url_types:
+        raise ValueError(f"지원하지 않는 URL 문서 유형입니다: {invalid_url_types}")
+
+    data_root = Path(output_root).expanduser().resolve() if output_root else DEFAULT_DATA_ROOT
+    client = load_tavily_client()
+    profile = find_service_profile(service_name)
+    resolved_domain = normalized_host(official_domain or "") or (
+        profile["official_domain"] if profile else None
+    )
+    if not resolved_domain and explicit_urls:
+        resolved_domain = normalized_host(next(iter(explicit_urls.values()))) or None
+
+    if profile and not official_domain:
+        print("등록된 공식 정책 URL 후보를 먼저 확인합니다.")
+    if not resolved_domain and client:
+        resolved_domain = discover_official_domain(client, service_name)
+
+    if resolved_domain:
+        print(f"검색에 사용할 공식 도메인: {resolved_domain}")
+    else:
+        print("공식 도메인을 자동 확인하지 못했습니다.")
+
+    saved: list[Path] = []
+    for document_type in requested_types:
+        explicit_url = explicit_urls.get(document_type)
+        page = (
+            policy_from_user_url(explicit_url, document_type)
+            if explicit_url
+            else None
+        )
+        if page is None and not explicit_url:
+            page = (
+                policy_from_known_urls(profile, document_type, resolved_domain)
+                if resolved_domain
+                else None
+            )
+        if page is None and client and resolved_domain:
+            page = policy_from_search(
+                client,
+                service_name,
+                document_type,
+                resolved_domain,
+            )
+        if page is None and allow_manual_url:
+            page = ask_manual_url(service_name, document_type, resolved_domain)
+        if page is None:
+            print(f"{DOCUMENTS[document_type]['label']}은 저장하지 않았습니다.")
+            continue
+
+        output_path = save_policy(data_root, service_name, document_type, page)
+        saved.append(output_path)
+        print(f"{DOCUMENTS[document_type]['label']} 저장 완료: {output_path}")
+        print(f"참조 URL: {page.final_url}")
+
+    return saved
+
+
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="공식 약관 및 개인정보처리방침 수집기")
     parser.add_argument("--service", help="구독형 서비스명 (생략 시 실행 중 입력)")
     parser.add_argument(
         "--official-domain",
         help="공식 도메인. 예: netflix.com. 지정하면 이 도메인과 하위 도메인만 검색합니다.",
+    )
+    parser.add_argument("--terms-url", help="사용자가 직접 지정한 공식 이용약관 URL")
+    parser.add_argument("--privacy-url", help="사용자가 직접 지정한 공식 개인정보처리방침 URL")
+    parser.add_argument(
+        "--output-root",
+        type=Path,
+        default=DEFAULT_DATA_ROOT,
+        help="수집 문서를 저장할 공용 데이터 폴더",
+    )
+    parser.add_argument(
+        "--non-interactive",
+        action="store_true",
+        help="자동 탐색 실패 시 URL 입력을 요청하지 않습니다.",
     )
     return parser.parse_args()
 
@@ -505,42 +631,16 @@ def main() -> int:
         print("서비스명이 비어 있어 종료합니다.")
         return 1
 
-    client = load_tavily_client()
-    profile = find_service_profile(service_name)
-    official_domain = normalized_host(args.official_domain or "") or (
-        profile["official_domain"] if profile else None
+    saved = collect_service_policies(
+        service_name=service_name,
+        official_domain=args.official_domain,
+        output_root=args.output_root,
+        policy_urls={
+            "terms": args.terms_url,
+            "privacy": args.privacy_url,
+        },
+        allow_manual_url=not args.non_interactive,
     )
-    if profile and not args.official_domain:
-        print("등록된 공식 정책 URL 후보를 먼저 확인합니다.")
-    if not official_domain and client:
-        official_domain = discover_official_domain(client, service_name)
-
-    if official_domain:
-        print(f"검색에 사용할 공식 도메인: {official_domain}")
-    else:
-        print("공식 도메인을 자동 확인하지 못했습니다. 자동 검색 대신 공식 URL 입력을 요청합니다.")
-
-    base_dir = Path(__file__).resolve().parent
-    saved: list[Path] = []
-    for document_type in ("terms", "privacy"):
-        # 고정 공식 URL → Tavily 공식 도메인 검색 → 사용자가 제공한 URL 순서다.
-        page = (
-            policy_from_known_urls(profile, document_type, official_domain)
-            if official_domain
-            else None
-        )
-        if page is None and client and official_domain:
-            page = policy_from_search(client, service_name, document_type, official_domain)
-        if page is None:
-            page = ask_manual_url(service_name, document_type, official_domain)
-        if page is None:
-            print(f"{DOCUMENTS[document_type]['label']}은 저장하지 않았습니다.")
-            continue
-
-        output_path = save_policy(base_dir, service_name, document_type, page)
-        saved.append(output_path)
-        print(f"{DOCUMENTS[document_type]['label']} 저장 완료: {output_path}")
-        print(f"참조 URL: {page.final_url}")
 
     return 0 if saved else 1
 

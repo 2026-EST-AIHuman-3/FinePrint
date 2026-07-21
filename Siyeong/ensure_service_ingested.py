@@ -1,15 +1,7 @@
-"""
-ensure_service_ingested.py
---------------------------------
-DB에 없는 서비스 이용약관을 크롤링한 뒤 저장·인제스트하여
-같은 프로세스에서 즉시 검색할 수 있도록 연결하는 wrapper.
+"""FinePrint의 수집 -> 인제스트 -> 검색 준비 흐름을 연결한다.
 
-흐름:
-search_tos.py -> RAG/terms/<service>/terms.txt
--> ingest_rag.ingest_file() -> search_utils.collection
-
-search_tos.py의 검색·선택·본문 추출 함수만 사용하며,
-파일 저장은 서비스명 정규화를 위해 이 모듈에서 담당한다.
+최종 수집기인 ``jhc.search_fineprint_v2``가 공용 데이터 폴더에 문서를
+저장하면, 이 모듈이 같은 파일을 ChromaDB에 즉시 인제스트한다.
 """
 
 from __future__ import annotations
@@ -17,110 +9,263 @@ from __future__ import annotations
 import re
 from pathlib import Path
 
-from config import SERVICE_NAME_ALIASES, normalize_service_key
-from ingest_rag import check_document_exists, ingest_file
+try:
+    from .config import (
+        COLLECTED_DATA_PATH,
+        DATA_PATH,
+        SERVICE_NAME_ALIASES,
+        normalize_service_key,
+    )
+    from .ingest_rag import (
+        check_document_exists,
+        ingest_faq_file,
+        ingest_file,
+        ingest_uploaded_file,
+    )
+    from .search_utils import collection
+except ImportError:
+    from config import (
+        COLLECTED_DATA_PATH,
+        DATA_PATH,
+        SERVICE_NAME_ALIASES,
+        normalize_service_key,
+    )
+    from ingest_rag import (
+        check_document_exists,
+        ingest_faq_file,
+        ingest_file,
+        ingest_uploaded_file,
+    )
+    from search_utils import collection
 
 
-RAG_TERMS_DIR = Path(__file__).resolve().parent / "RAG" / "terms"
+DATA_ROOT = Path(DATA_PATH)
+COLLECTED_DATA_ROOT = Path(COLLECTED_DATA_PATH)
+TERMS_DATA_DIRS = (
+    DATA_ROOT / "terms",
+    COLLECTED_DATA_ROOT / "terms",
+)
+POLICY_SUBTYPES = {
+    "terms": "terms_of_use",
+    "privacy": "privacy_policy",
+}
+_reference_data_ready = False
+_service_collection_attempted: set[str] = set()
 
 
 def has_korean(text: str) -> bool:
-    """문자열에 한글 완성형 문자가 포함되어 있는지 확인한다."""
     return bool(re.search(r"[\uac00-\ud7a3]", text))
 
 
 def resolve_canonical_service_name(user_input: str) -> str:
-    """입력된 서비스명을 DB 및 폴더에서 사용할 대표 이름으로 변환한다.
-
-    기존 DB가 한글 폴더명을 사용하는 경우 한글 이름을 우선한다.
-    별칭 테이블에 등록되지 않은 서비스는 공백을 제거한 입력값을 그대로 쓴다.
-    """
+    """영문/한글 별칭을 기존 DB 폴더명과 맞는 대표 서비스명으로 변환한다."""
     cleaned = user_input.strip()
     if not cleaned:
         raise ValueError("service_name은 빈 값일 수 없습니다.")
 
-    normalized = normalize_service_key(cleaned)
-    alias = SERVICE_NAME_ALIASES.get(normalized)
-
+    alias = SERVICE_NAME_ALIASES.get(normalize_service_key(cleaned))
     if alias and has_korean(alias):
         return alias
     if has_korean(cleaned):
         return cleaned
-    if alias:
-        return alias
-    return cleaned
+    return alias or cleaned
 
 
-def save_terms(service_name: str, content: str) -> Path:
-    """크롤링한 약관을 RAG/terms/<service>/terms.txt에 UTF-8로 저장한다."""
+def _policy_status(service_name: str) -> dict[str, bool]:
+    return {
+        document_type: check_document_exists(service_name, subtype)
+        for document_type, subtype in POLICY_SUBTYPES.items()
+    }
+
+
+def _matching_service_directories(service_name: str) -> list[Path]:
     canonical_name = resolve_canonical_service_name(service_name)
-    service_dir = RAG_TERMS_DIR / canonical_name
-    service_dir.mkdir(parents=True, exist_ok=True)
+    matches: list[Path] = []
+    for terms_data_dir in TERMS_DATA_DIRS:
+        if not terms_data_dir.is_dir():
+            continue
+        for directory in terms_data_dir.iterdir():
+            if not directory.is_dir():
+                continue
+            if resolve_canonical_service_name(directory.name) == canonical_name:
+                matches.append(directory)
+    return matches
 
-    file_path = service_dir / "terms.txt"
-    file_path.write_text(content, encoding="utf-8")
-    return file_path
+
+def ingest_local_service_documents(service_name: str) -> int:
+    """이미 수집되어 있는 서비스 문서를 먼저 DB에 반영한다."""
+    success_count = 0
+    for directory in _matching_service_directories(service_name):
+        for path in sorted(directory.iterdir()):
+            if path.suffix.lower() in {".txt", ".pdf"}:
+                success_count += int(ingest_file(path))
+            elif path.suffix.lower() == ".json":
+                success_count += int(ingest_faq_file(path))
+    return success_count
 
 
-def ensure_service_ingested(service_name: str) -> bool:
-    """서비스 이용약관이 검색 가능한 상태인지 보장한다.
+def _has_document_type(doc_type: str) -> bool:
+    result = collection.get(where={"type": doc_type}, limit=1)
+    return bool(result.get("ids"))
 
-    이미 해당 서비스의 ``type=terms`` 및
-    ``doc_subtype=terms_of_use`` 레코드가 있으면 크롤링을 생략한다.
-    FAQ만 존재하는 경우에는 약관이 존재한다고 판단하지 않는다.
 
-    약관이 없으면 검색, 원문 추출, 파일 저장, DB 인제스트를 순서대로
-    실행하고 전체 과정의 성공 여부를 반환한다.
-    """
-    canonical_name = resolve_canonical_service_name(service_name)
-
-    if check_document_exists(
-        canonical_name,
-        doc_subtype="terms_of_use",
-    ):
-        print(f"[SKIP] 이미 이용약관이 DB에 있음: {canonical_name}")
+def ensure_reference_data_ingested() -> bool:
+    """소비자 보호 법률·가이드라인을 프로세스당 한 번 준비한다."""
+    global _reference_data_ready
+    if _reference_data_ready:
         return True
 
-    # 약관이 이미 DB에 있으면 크롤링 의존성을 불러올 필요가 없다.
-    # API 키나 선택적 패키지가 없는 환경에서도 DB 확인은 가능해야 한다.
-    from search_tos import extract_raw_tos, search_tos, select_best_result
+    required_types = ("law", "guideline")
+    if all(_has_document_type(doc_type) for doc_type in required_types):
+        _reference_data_ready = True
+        return True
 
-    print(f"[CRAWL] '{service_name}' 약관 검색 중...")
+    for folder_name in required_types:
+        folder = DATA_ROOT / folder_name
+        if not folder.is_dir():
+            print(f"[WARNING] 소비자 보호 데이터 폴더가 없습니다: {folder}")
+            continue
+        for path in sorted(folder.rglob("*")):
+            if path.suffix.lower() not in {".txt", ".pdf"}:
+                continue
+            try:
+                ingest_file(path)
+            except Exception as exc:
+                print(f"[ERROR] 소비자 보호 문서 인제스트 실패: {path} / {exc}")
 
-    search_results = search_tos(service_name)
-    if not search_results:
-        print(f"[FAIL] 검색 결과 없음: {service_name}")
+    _reference_data_ready = all(
+        _has_document_type(doc_type) for doc_type in required_types
+    )
+    return _reference_data_ready
+
+
+def ensure_service_ingested(
+    service_name: str,
+    policy_urls: dict[str, str] | None = None,
+) -> bool:
+    """URL·로컬 문서를 우선 사용하고, 부족하면 자동 수집 후 즉시 인제스트한다."""
+    canonical_name = resolve_canonical_service_name(service_name)
+    explicit_urls = {
+        document_type: url.strip()
+        for document_type, url in (policy_urls or {}).items()
+        if url and url.strip()
+    }
+    invalid_types = [name for name in explicit_urls if name not in POLICY_SUBTYPES]
+    if invalid_types:
+        raise ValueError(f"지원하지 않는 URL 문서 유형입니다: {invalid_types}")
+
+    status = _policy_status(canonical_name)
+    if all(status.values()) and not explicit_urls:
+        print(f"[SKIP] 서비스 약관·정책이 DB에 있음: {canonical_name}")
+        return True
+
+    ingest_local_service_documents(canonical_name)
+    status = _policy_status(canonical_name)
+    missing_types = [name for name, exists in status.items() if not exists]
+    requested_types = tuple(dict.fromkeys([*explicit_urls, *missing_types]))
+    if not requested_types:
+        return True
+    if canonical_name in _service_collection_attempted and not explicit_urls:
+        return any(status.values())
+
+    _service_collection_attempted.add(canonical_name)
+
+    try:
+        from jhc.search_fineprint_v2 import collect_service_policies
+
+        saved_paths = collect_service_policies(
+            service_name=canonical_name,
+            output_root=COLLECTED_DATA_ROOT,
+            document_types=requested_types,
+            policy_urls=explicit_urls,
+            allow_manual_url=False,
+        )
+    except Exception as exc:
+        print(f"[ERROR] 약관·정책 자동 수집 실패: {canonical_name} / {exc}")
+        saved_paths = []
+
+    for path in saved_paths:
+        try:
+            ingest_file(path)
+        except Exception as exc:
+            print(f"[ERROR] 수집 문서 인제스트 실패: {path} / {exc}")
+
+    final_status = _policy_status(canonical_name)
+    # 하나의 공식 정책만 확보된 경우에도 기존 근거로 질문 처리는 가능하다.
+    return any(final_status.values())
+
+
+def prepare_knowledge_base(
+    service_name: str,
+    policy_urls: dict[str, str] | None = None,
+) -> dict[str, object]:
+    """Agent 검색 전에 두 지식베이스를 준비하고 상태를 반환한다."""
+    canonical_name = resolve_canonical_service_name(service_name)
+    reference_ready = ensure_reference_data_ingested()
+    service_ready = ensure_service_ingested(canonical_name, policy_urls=policy_urls)
+    policy_status = _policy_status(canonical_name)
+    missing_policy_types = [
+        document_type
+        for document_type, is_ready in policy_status.items()
+        if not is_ready
+    ]
+    return {
+        "service_name": canonical_name,
+        "service_documents_ready": service_ready,
+        "reference_documents_ready": reference_ready,
+        "policy_status": policy_status,
+        "missing_policy_types": missing_policy_types,
+        "requires_policy_input": bool(missing_policy_types),
+    }
+
+
+def ingest_user_document(
+    path: str | Path,
+    service_name: str,
+    doc_subtype: str | None = None,
+) -> bool:
+    """PDF/TXT 직접 업로드 시 UI가 호출할 공개 진입점."""
+    canonical_name = resolve_canonical_service_name(service_name)
+    return ingest_uploaded_file(
+        path=path,
+        service_name=canonical_name,
+        doc_type="terms",
+        doc_subtype=doc_subtype,
+    )
+
+
+def ingest_user_url(
+    url: str,
+    service_name: str,
+    document_type: str = "terms",
+) -> bool:
+    """사용자가 지정한 공식 URL을 수집·저장하고 즉시 인제스트한다."""
+    if document_type not in POLICY_SUBTYPES:
+        raise ValueError(f"지원하지 않는 문서 유형입니다: {document_type}")
+
+    canonical_name = resolve_canonical_service_name(service_name)
+    try:
+        from jhc.search_fineprint_v2 import collect_service_policies
+
+        saved_paths = collect_service_policies(
+            service_name=canonical_name,
+            output_root=COLLECTED_DATA_ROOT,
+            document_types=(document_type,),
+            policy_urls={document_type: url},
+            allow_manual_url=False,
+        )
+    except Exception as exc:
+        print(f"[ERROR] 사용자 URL 수집 실패: {url} / {exc}")
         return False
 
-    best = select_best_result(service_name, search_results)
-    if best is None or not best.get("url"):
-        print(f"[FAIL] 약관 페이지를 찾지 못함: {service_name}")
-        return False
-
-    selected_url = best["url"]
-    print(f"[CRAWL] 선택된 URL: {selected_url}")
-
-    raw_content = extract_raw_tos(selected_url)
-    if not raw_content or not raw_content.strip():
-        print(f"[FAIL] 본문 추출 실패: {selected_url}")
-        return False
-
-    file_path = save_terms(canonical_name, raw_content)
-    print(f"[SAVE] {file_path}")
-
-    success = ingest_file(file_path)
-    if success:
-        print(f"[DONE] '{canonical_name}' ingest 완료, 바로 검색 가능")
-    else:
-        print(f"[FAIL] '{canonical_name}' ingest 실패")
-    return success
+    return bool(saved_paths) and all(ingest_file(path) for path in saved_paths)
 
 
 if __name__ == "__main__":
-    name = input("확인/크롤링할 서비스명을 입력하세요: ").strip()
+    name = input("확인/수집할 서비스명을 입력하세요: ").strip()
     try:
-        ok = ensure_service_ingested(name)
+        result = prepare_knowledge_base(name)
     except ValueError as exc:
         print(f"[FAIL] {exc}")
-        ok = False
-    print("성공" if ok else "실패")
+    else:
+        print(result)

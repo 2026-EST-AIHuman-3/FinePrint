@@ -14,10 +14,24 @@ ingest_rag.py와 search_utils.py 양쪽에서 이 값을 import해서 사용하�
 # )
 
 import os
+from pathlib import Path
 
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+BASE_DIR = Path(__file__).resolve().parent
+PROJECT_ROOT = BASE_DIR.parent
 
-DB_PATH = os.getenv("CHROMA_DB_PATH", os.path.join(BASE_DIR, "db"))
+# 소비자 보호 원천과 수집된 서비스 정책의 위치를 실행 경로와 무관하게 고정한다.
+# 배포 환경에서는 환경 변수로 각 위치를 바꿀 수 있다.
+DATA_PATH = Path(
+    os.getenv("FINEPRINT_DATA_PATH", str(BASE_DIR / "data"))
+).expanduser().resolve()
+# jhc 최종 수집기가 관리하는 서비스별 약관·정책 원문 위치.
+COLLECTED_DATA_PATH = Path(
+    os.getenv(
+        "FINEPRINT_POLICY_DATA_PATH",
+        str(PROJECT_ROOT / "jhc" / "RAG"),
+    )
+).expanduser().resolve()
+DB_PATH = os.getenv("CHROMA_DB_PATH", str(BASE_DIR / "db"))
 COLLECTION_NAME = os.getenv("CHROMA_COLLECTION_NAME", "RAG_system")
 EMBEDDING_MODEL = os.getenv(
     "CHROMA_EMBEDDING_MODEL", "paraphrase-multilingual-mpnet-base-v2"

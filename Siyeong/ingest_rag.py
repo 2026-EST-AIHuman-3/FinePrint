@@ -33,11 +33,14 @@ import json
 # "크롤링 -> ingest -> 바로 검색" 같은 한 흐름 안에서 방금 넣은 데이터가 안 보이는
 # 문제가 생길 수 있다. 객체를 하나로 통일해 이 문제를 원천적으로 없앤다.
 try:
+    from .config import DATA_PATH
     from .search_utils import collection
 except ImportError:
+    from config import DATA_PATH
     from search_utils import collection
 
-RAG_PATH = "./RAG"
+# 실행 위치에 따라 달라지던 ./RAG 대신 세 모듈이 공유하는 절대 데이터 경로를 사용한다.
+RAG_PATH = str(DATA_PATH)
 
 # 청킹 방식이나 메타데이터 구조가 바뀌면 값을 올린다.
 # 본문이 같아도 이전 스키마로 저장된 레코드는 다시 인제스트되어야 한다.
@@ -762,6 +765,41 @@ def ingest_from_pasted_text(
         text=pasted_text,
         source_kind="pasted",
         doc_subtype=doc_subtype,
+    )
+
+
+def ingest_uploaded_file(
+    path: str | Path,
+    service_name: str,
+    doc_type: str = "terms",
+    doc_subtype: str | None = None,
+) -> bool:
+    """UI로 업로드된 PDF/TXT를 경로 구조에 의존하지 않고 인제스트한다."""
+    _validate_manual_input(service_name, doc_type)
+    upload_path = Path(path).expanduser().resolve()
+    if upload_path.suffix.lower() not in {".pdf", ".txt"}:
+        raise ValueError("업로드 문서는 PDF 또는 TXT 형식이어야 합니다.")
+    if not upload_path.is_file():
+        raise FileNotFoundError(f"업로드 문서를 찾을 수 없습니다: {upload_path}")
+
+    text = load_file(upload_path)
+    if not text or not text.strip():
+        return False
+
+    resolved_subtype = doc_subtype or infer_doc_subtype(upload_path)
+    if resolved_subtype == "unknown" and doc_type == "terms":
+        resolved_subtype = "terms_of_use"
+
+    document_hash = compute_document_hash(text)
+    source_id = f"upload::{service_name.strip()}::{upload_path.name}::{document_hash[:12]}"
+    return ingest_text(
+        source_id=source_id,
+        source_label=upload_path.name,
+        doc_type=doc_type,
+        service_name=service_name.strip(),
+        text=text,
+        source_kind="upload",
+        doc_subtype=resolved_subtype,
     )
 
 

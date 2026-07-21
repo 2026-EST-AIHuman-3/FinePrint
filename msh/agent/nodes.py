@@ -1,8 +1,12 @@
 from dotenv import load_dotenv
-from agent.state import FinePrintState
-from agent.schemas import IntentResult, VerificationResult, ImprovementResult, FinalAnswerResult
+from .state import FinePrintState
+from .schemas import IntentResult, VerificationResult, ImprovementResult, FinalAnswerResult
 from langchain.chat_models import init_chat_model
-from rag_adapter import retrieve_rag_context
+try:
+    from ..rag_adapter import retrieve_rag_context
+except ImportError:
+    # ``python msh/test_agent.py`` 방식의 기존 실행도 지원한다.
+    from rag_adapter import retrieve_rag_context
 
 load_dotenv()
 
@@ -218,6 +222,7 @@ def retrieve_context(state: FinePrintState):
             "improvement_instruction",
             "",
         ),
+        policy_urls=state.get("policy_urls"),
     )
 
     return {

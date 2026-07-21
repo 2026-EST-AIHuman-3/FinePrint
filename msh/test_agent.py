@@ -1,4 +1,8 @@
-from agent.workflow import graph
+try:
+    from .agent.workflow import graph
+except ImportError:
+    # ``python msh/test_agent.py`` 실행도 계속 지원한다.
+    from agent.workflow import graph
 
 
 initial_state = {

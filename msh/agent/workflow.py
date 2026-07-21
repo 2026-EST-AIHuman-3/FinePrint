@@ -1,7 +1,7 @@
 from langgraph.graph import StateGraph, START, END
 
-from agent.state import FinePrintState
-from agent.nodes import (
+from .state import FinePrintState
+from .nodes import (
     classify_intent,
     retrieve_context,
     generate_answer,
