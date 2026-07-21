@@ -243,3 +243,6 @@ ocr_output/
 
 # RAG 폴더 안의 PDF는 포함
 !RAG/**/*.pdf
+
+db_backup_*/
+db_backup_*

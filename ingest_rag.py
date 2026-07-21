@@ -25,6 +25,7 @@ from pathlib import Path
 
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from PyPDF2 import PdfReader
+import json
 
 # search_utils.py가 이미 만들어둔 collection을 그대로 재사용한다.
 # ingest와 search가 각자 별도의 PersistentClient 인스턴스를 갖고 있으면
@@ -37,6 +38,10 @@ except ImportError:
     from search_utils import collection
 
 RAG_PATH = "./RAG"
+
+# 청킹 방식이나 메타데이터 구조가 바뀌면 값을 올린다.
+# 본문이 같아도 이전 스키마로 저장된 레코드는 다시 인제스트되어야 한다.
+INGEST_SCHEMA_VERSION = 4
 
 
 def check_document_exists(service_name: str, doc_subtype: str | None = None) -> bool:
@@ -57,9 +62,14 @@ def check_document_exists(service_name: str, doc_subtype: str | None = None) -> 
     return len(results["ids"]) > 0
 
 ARTICLE_PATTERN = re.compile(r"(?=제\s*\d+\s*조(?:\s*의\s*\d+)?)")
-NUMBERED_OUTLINE_PATTERN = re.compile(r"(?=^\d+(?:\.\d+)*\.\s+.+$)", re.MULTILINE)
+NUMBERED_OUTLINE_PATTERN = re.compile(r"(?=^\d{1,3}(?:\.\d+)*\.\s+.+$)", re.MULTILINE)
 GUIDELINE_PATTERN = re.compile(r"(?=^\s*\d+\.\s+.+$)", re.MULTILINE)
 ARTICLE_NO_PATTERN = re.compile(r"제\s*(\d+\s*조(?:\s*의\s*\d+)?)")
+NUMBERED_SECTION_PATTERN = re.compile(
+    r"^\s*(\d{1,3}(?:\.\d+)*\.)\s+",  # {1,3} 추가!
+    re.MULTILINE,
+)
+BRACKET_HEADING_PATTERN = re.compile(r"^\s*\[([^\]\r\n]{1,100})\]")
 
 HEADING_ENDINGS = ("다", "요", "함", "임", "됨", "음", ".", ")", ":", "」")
 
@@ -406,7 +416,36 @@ def chunk_text(text: str, doc_type: str) -> list[str]:
 
 def extract_article(chunk: str) -> str:
     match = ARTICLE_NO_PATTERN.search(chunk)
-    return match.group(0).replace(" ", "") if match else "unknown"
+    if match:
+        return re.sub(r"\s+", "", match.group(0))
+
+    match = NUMBERED_SECTION_PATTERN.search(chunk)
+    if match:
+        return match.group(1)
+
+    match = BRACKET_HEADING_PATTERN.match(chunk)
+    if match:
+        return f"[{match.group(1).strip()}]"
+
+    return "unknown"
+
+
+def extract_article_no(chunk: str) -> str:
+    """한국어 조문 또는 숫자 섹션 번호를 검색·필터용 정규형으로 반환한다.
+
+    ``제12조``는 ``12조``, ``제12조의3``은 ``12조의3``으로 저장해
+    가지 조항의 번호가 유실되지 않도록 한다. 영문 약관의 ``2.7.``은
+    ``2.7``로 저장한다. 번호가 없는 대괄호 제목은 ``unknown``을 반환한다.
+    """
+    match = ARTICLE_NO_PATTERN.search(chunk)
+    if match:
+        return re.sub(r"\s+", "", match.group(1))
+
+    match = NUMBERED_SECTION_PATTERN.search(chunk)
+    if match:
+        return match.group(1).rstrip(".")
+
+    return "unknown"
 
 
 def make_chunk_id(source_id: str, index: int, chunk: str) -> str:
@@ -431,6 +470,28 @@ def compute_document_hash(text: str) -> str:
     같은 문서가 URL 크롤링/붙여넣기 등 다른 경로로 들어와도 동일 해시를 갖도록 한다."""
     normalized = re.sub(r"\s+", "", text)
     return hashlib.md5(normalized.encode("utf-8")).hexdigest()
+
+
+def has_unchanged_source(source_id: str, document_hash: str) -> bool:
+    """같은 소스가 같은 본문과 현재 인제스트 스키마로 저장됐는지 확인한다.
+
+    스키마 버전까지 검사하므로 article_no 같은 메타데이터가 새로 추가된 경우에는
+    본문이 같더라도 한 번 다시 인제스트된다.
+    """
+    if not source_id or not document_hash:
+        return False
+
+    results = collection.get(
+        where={
+            "$and": [
+                {"source": source_id},
+                {"document_hash": document_hash},
+                {"ingest_schema_version": INGEST_SCHEMA_VERSION},
+            ]
+        },
+        limit=1,
+    )
+    return bool(results["ids"])
 
 
 def find_duplicate_source(
@@ -488,14 +549,79 @@ def upsert_chunks(
                 "scope": scope,  # service_specific / shared (여러 서비스 공통 문서, 예: 구글 통합 개인정보처리방침)
                 "chunk_index": index,
                 "article": extract_article(chunk),
+                "article_no": extract_article_no(chunk),
                 "content_hash": hashlib.md5(chunk.encode("utf-8")).hexdigest(),
                 "document_hash": document_hash,  # 문서 단위 해시 (다른 source_id 간 중복 탐지용)
+                "ingest_schema_version": INGEST_SCHEMA_VERSION,
                 "updated_at": updated_at,  # 이 청크가 (재)삽입된 시각
             }
         )
 
     # 청크마다 upsert를 반복 호출하지 않고 한 번에 배치로 전송 (임베딩 계산도 배치로 처리됨)
     collection.upsert(ids=ids, documents=documents, metadatas=metadatas)
+
+def ingest_crawled_jsonl(path: Path) -> bool:
+    """search_tos_fineprint.py가 생성한 knowledge_base.jsonl을 처리."""
+    try:
+        with path.open("r", encoding="utf-8") as f:
+            lines = f.readlines()
+    except Exception as e:
+        print(f"[ERROR] JSONL 읽기 실패: {path} / {e}")
+        return False
+
+    success = False
+    for line in lines:
+        try:
+            data = json.loads(line)
+        except json.JSONDecodeError:
+            continue
+
+        # CollectedDocument 필드 추출
+        service_name = data.get("service_name", "unknown")
+        doc_type_raw = data.get("document_type", "terms")  # terms, privacy, refund_cancellation 등
+        title = data.get("title", "")
+        source_url = data.get("source_url", "")
+        source_kind = data.get("source_kind", "web_html")
+        revision_date = data.get("revision_date")
+        text = data.get("text", "")
+
+        if not text or len(text.strip()) < 200:
+            continue
+
+        # doc_type 매핑 (ingest_text는 "law"/"guideline"/"terms"만 허용)
+        # → 일단 모두 "terms"로 저장하되, doc_subtype으로 구분
+        doc_type = "terms"
+
+        # doc_subtype 매핑
+        doc_subtype_map = {
+            "terms": "terms_of_use",
+            "privacy": "privacy_policy",
+            "refund_cancellation": "refund_policy",
+            "billing_autorenewal": "payment_policy",
+            "platform_refund": "refund_policy",
+        }
+        doc_subtype = doc_subtype_map.get(doc_type_raw, "unknown")
+
+        # 개정일을 메타데이터에 포함시키기 위해 text에 추가 (또는 별도 처리)
+        if revision_date and revision_date not in text:
+            text = f"{text}\n\n[개정일: {revision_date}]"
+
+        # source_id: URL이 없으면 파일명 사용
+        source_id = source_url if source_url else path.as_posix()
+
+        result = ingest_text(
+            source_id=source_id,
+            source_label=title or path.name,
+            doc_type=doc_type,
+            service_name=service_name,
+            text=text,
+            source_kind=source_kind,
+            doc_subtype=doc_subtype,
+        )
+        if result:
+            success = True
+
+    return success
 
 
 def ingest_text(
@@ -516,6 +642,10 @@ def ingest_text(
     text = clean_scraped_text(text)
     document_hash = compute_document_hash(text)
 
+    if has_unchanged_source(source_id, document_hash):
+        print(f"[SKIP] 변경되지 않은 문서: {source_label}")
+        return True
+
     duplicate_source = find_duplicate_source(
         service_name, document_hash, exclude_source_id=source_id
     )
@@ -524,7 +654,7 @@ def ingest_text(
             f"[SKIP] 동일 내용이 이미 다른 source로 등록되어 있습니다: "
             f"{duplicate_source} (신규 source: {source_id})"
         )
-        return False
+        return True  # False → True (정상 스킵으로 간주)
 
     scope = infer_scope(text)
     if scope == "shared":
@@ -622,6 +752,7 @@ def iter_source_files(base_path: str = RAG_PATH) -> list[Path]:
         list(base.rglob("*.txt"))
         + list(base.rglob("*.pdf"))
         + list(base.rglob("*.json"))
+        + list(base.rglob("*.jsonl"))
     )
     return sorted(files)
 
@@ -696,7 +827,6 @@ def load_faq_json(path: Path) -> list[dict] | None:
     반환: list[dict] (성공) / None (실패)
     """
     try:
-        import json
         text = path.read_text(encoding="utf-8")
         data = json.loads(text)
         
@@ -863,14 +993,23 @@ def ingest_all(base_path: str = RAG_PATH) -> None:
     
     for path in all_files:
         try:
-            if path.suffix.lower() == ".json":
+            suffix = path.suffix.lower()
+            
+            # ✅ 수정: .jsonl을 먼저 체크
+            if suffix == ".jsonl":
+                # 크롤러 JSONL 처리
+                if ingest_crawled_jsonl(path):
+                    success_count += 1
+                else:
+                    fail_count += 1
+            elif suffix == ".json":
                 # FAQ 파일 처리
                 if ingest_faq_file(path):
                     success_count += 1
                 else:
                     fail_count += 1
             else:
-                # 기존 문서 파일 처리
+                # 기존 문서 파일 처리 (.txt, .pdf)
                 if ingest_file(path):
                     success_count += 1
                 else:
@@ -880,7 +1019,7 @@ def ingest_all(base_path: str = RAG_PATH) -> None:
             print(f"[ERROR] 처리 실패: {path} / {exc}")
             fail_count += 1
     
-    sweep_stale_sources(base_path)  # 삭제된 파일 정리 (파일/JSON 모두)
+    sweep_stale_sources(base_path)  # 삭제·이름변경된 로컬 파일(source_kind="file") 정리
     
     print()
     print(f"[SUMMARY] 성공: {success_count}")
@@ -891,3 +1030,4 @@ def ingest_all(base_path: str = RAG_PATH) -> None:
 
 if __name__ == "__main__":
     ingest_all()
+
