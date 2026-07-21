@@ -14,6 +14,30 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from search_utils import hybrid_search, collection, print_results
 
+def show_terms_subtypes():
+    data = collection.get(where={"type": "terms"})
+
+    print("\n=== 이용약관·정책 파일별 doc_subtype ===")
+    seen = set()
+
+    for meta in data["metadatas"]:
+        key = (
+            meta.get("service_name"),
+            meta.get("source_file"),
+            meta.get("doc_subtype", "unknown"),
+            meta.get("ingest_schema_version"),
+        )
+
+        if key in seen:
+            continue
+
+        seen.add(key)
+        print(
+            f"service={key[0]} | "
+            f"file={key[1]} | "
+            f"doc_subtype={key[2]} | "
+            f"schema={key[3]}"
+        )
 
 def show_metadata_samples(limit=5):
     """저장된 문서의 메타데이터 샘플을 출력."""
@@ -21,12 +45,14 @@ def show_metadata_samples(limit=5):
     if not all_data["ids"]:
         print("[INFO] DB가 비어 있습니다. ingest_rag.py를 먼저 실행하세요.")
         return
+    
 
     print("\n=== DB 메타데이터 샘플 (첫 %d개) ===" % limit)
     for i, meta in enumerate(all_data["metadatas"]):
         print(f"[{i+1}]")
         print(f"  service_name: {meta.get('service_name')}")
         print(f"  type:         {meta.get('type')}")
+        print(f"  doc_subtype:  {meta.get('doc_subtype', 'unknown')}")
         print(f"  article:      {meta.get('article', 'unknown')}")
         print(f"  article_no:   {meta.get('article_no', 'unknown')}")
         print(f"  source:       {meta.get('source')}")
@@ -138,6 +164,8 @@ def run_all_tests():
 
     # 1. 메타데이터 샘플
     show_metadata_samples(5)
+
+    show_terms_subtypes()
 
     # 2. article 추출 현황
     verify_article_extraction()

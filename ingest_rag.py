@@ -41,7 +41,7 @@ RAG_PATH = "./RAG"
 
 # 청킹 방식이나 메타데이터 구조가 바뀌면 값을 올린다.
 # 본문이 같아도 이전 스키마로 저장된 레코드는 다시 인제스트되어야 한다.
-INGEST_SCHEMA_VERSION = 4
+INGEST_SCHEMA_VERSION = 5
 
 
 def check_document_exists(service_name: str, doc_subtype: str | None = None) -> bool:
@@ -239,10 +239,34 @@ def infer_faq_service_name(path: Path) -> str:
 
 
 DOC_SUBTYPE_KEYWORDS = {
-    "privacy_policy": ["개인정보", "프라이버시", "privacy"],
-    "refund_policy": ["환불", "취소", "refund"],
-    "payment_policy": ["결제", "자동결제", "payment"],
-    "terms_of_use": ["이용약관", "서비스약관", "이용규칙", "terms"],
+    "terms_of_use": [           # ⭐ 1순위: 이용약관 먼저 검사
+        "이용약관",
+        "서비스약관",
+        "이용규칙",
+        "terms_of_use",
+        "terms-of-use",
+        "terms",                # tos는 제외!
+    ],
+    "privacy_policy": [
+        "개인정보",
+        "프라이버시",
+        "privacy",
+    ],
+    "refund_policy": [
+        "환불",
+        "취소",
+        "해지",
+        "refund",
+        "cancellation",         # ⭐ 추가
+    ],
+    "payment_policy": [
+        "결제",
+        "자동결제",
+        "정기결제",
+        "payment",
+        "billing",
+        "renewal",              # ⭐ 추가
+    ],
 }
 
 
@@ -250,7 +274,7 @@ def infer_doc_subtype(path: Path) -> str:
     """파일명 키워드로 문서 종류를 구분 (이용약관 / 개인정보처리방침 / 환불정책 등).
     같은 service_name이라도 문서 종류가 다르면 check_document_exists에서
     별개로 취급해야 하므로 별도 필드로 관리한다."""
-    name = path.stem
+    name = path.stem.lower()
 
     for subtype, keywords in DOC_SUBTYPE_KEYWORDS.items():
         if any(keyword in name for keyword in keywords):
