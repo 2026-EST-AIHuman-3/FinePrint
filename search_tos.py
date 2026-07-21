@@ -256,6 +256,27 @@ def content_looks_like_terms(content):
         return True
     return False
 
+
+def contains_korean(text):
+    return bool(text and re.search(r'[\uac00-\ud7a3]', text))
+
+
+def url_indicates_korean_locale(url):
+    if not url:
+        return False
+    u = url.lower()
+    return (
+        '.kr' in u
+        or '/ko/' in u
+        or u.endswith('/ko')
+        or re.search(r'(?:[?&](?:hl|lang|locale)=ko)(?:&|$)', u)
+    )
+
+
+def page_is_korean(url, content):
+    return url_indicates_korean_locale(url) or contains_korean(content)
+
+
 def is_news_article(content, url):
     if not content:
         return False
@@ -298,6 +319,7 @@ SCORE_WEIGHTS = {
     "root_path_penalty": -40,     # 루트 경로('/')만 가리키는 URL (약관 페이지일 가능성 낮음)
     "blacklisted_domain": -40,    # 블랙리스트 도메인 (블로그, 뉴스, 집계 사이트 등)
     "official_domain_bonus": 80,  # 공식 도메인이면서 경로/본문 증거가 있을 때 주는 추가 신뢰 보너스
+    "korean_locale_bonus": 60,   # 한국어/한국 로케일 페이지를 우대
     "unrelated_domain_penalty": -60,  # 공식 도메인도 아니고 서비스명과 관련도 없을 때
     "canonical_domain_bonus": 30,     # www.서비스.com / 서비스.com 같은 대표 도메인
     "different_product_subdomain_penalty": -50,  # kids./business./ads. 등 아예 다른 제품/서비스
@@ -406,6 +428,9 @@ def compute_score(service_name, r, check_relevance=True, with_reasons=False):
             add("official_domain_bonus")
     elif check_relevance and not host_related(url, service_name):
         add("unrelated_domain_penalty")
+
+    if page_is_korean(url, snippet):
+        add("korean_locale_bonus")
 
     # 대표 도메인(www.서비스.com 등)은 우대.
     # kids./ads. 같은 '완전히 다른 제품' 서브도메인은 terms 증거 유무와 무관하게 항상 감점.
