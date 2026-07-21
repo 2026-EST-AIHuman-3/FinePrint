@@ -346,3 +346,11 @@ for result in results:
 - FAQ JSON은 일반 문서와 달리 현재 변경 감지 스킵을 적용하지 않습니다.
 - HF Hub 미인증 경고는 다운로드 제한에 관한 경고입니다. 모델이 정상 로딩되면 검색 실행 오류는 아닙니다.
 
+## 사용 모델 및 라이선스
+
+이 프로젝트는 `sentence-transformers/paraphrase-multilingual-mpnet-base-v2`
+모델을 사용합니다.
+
+- License: Apache License 2.0
+- Model: https://huggingface.co/sentence-transformers/paraphrase-multilingual-mpnet-base-v2
+- License: https://www.apache.org/licenses/LICENSE-2.0
