@@ -1,235 +1,348 @@
 # FinePrint
-RAG-based AI Agent for analyzing subscription service terms and policies.
 
-PDF 파싱 및 청킹, 임베딩 후 ChromaDB에 저장하는 파일입니다. (`ingest_rag.py`)
-RAG에 자료를 넣어둔 후 py파일을 실행합니다.
+구독 서비스의 이용약관·개인정보처리방침·환불 및 결제 정책을 수집하고, RAG 기반으로 관련 조항을 검색하기 위한 프로젝트입니다.
 
-## 구조
+TXT, PDF, JSON, JSONL 문서를 불러와 구조에 맞게 청킹한 후 임베딩하고 ChromaDB에 저장합니다. 사용자 질문이 들어오면 의미 기반 검색과 키워드 가중치 재정렬을 통해 관련 약관과 법률 근거를 찾습니다.
 
-- **`ingest_rag.py`**: 문서 로딩, 청킹, 임베딩, ChromaDB 저장 담당
-- **`search_utils.py`**: 하이브리드 검색(의미 기반 + 키워드 가중치) 담당
-- **`config.py`**: 공유 설정 (DB 경로, 임베딩 모델 등)
+## 주요 기능
 
-## 사용 흐름
-RAG/ 폴더에 약관/법령 문서 추가 <br>
-　　　　　　　↓ <br>
+- TXT·PDF 약관, 법률 및 행정지침 인제스트
+- 크롤러가 생성한 `knowledge_base.jsonl` 인제스트
+- FAQ JSON 항목별 인제스트
+- 한국어·영문 약관 구조에 따른 자동 청킹
+- 서비스명, 문서 종류 및 조항 메타데이터 저장
+- 동일 문서 중복 입력 방지
+- 변경되지 않은 일반 문서의 재임베딩 생략
+- 삭제·이름 변경된 로컬 파일의 잔존 청크 정리
+- Sentence Transformer 기반 Dense 검색
+- 도메인 키워드 일치 가중치를 이용한 검색 결과 재정렬
+- 서비스별 검색 및 기대 조항 검증
+
+## 주요 파일
+
+| 파일 | 역할 |
+|---|---|
+| `search_tos_fineprint.py` | 공식 약관·정책 검색, 본문 추출 및 JSONL 저장 |
+| `ingest_rag.py` | 문서 로딩, 청킹, 임베딩 및 ChromaDB 저장 |
+| `search_utils.py` | Dense 검색, 서비스 필터 및 키워드 가중치 재정렬 |
+| `config.py` | DB 경로, 컬렉션명, 임베딩 모델 및 서비스 별칭 관리 |
+| `verify_rag.py` | DB 메타데이터와 대표 검색 질의 검증 |
+| `ensure_service_ingested.py` | DB에 없는 서비스 약관을 동적으로 수집하는 선택적 wrapper |
+
+> `ensure_service_ingested.py`는 크롤러와 Python 호출 인터페이스가 연결된 환경에서 사용합니다. 발표용 사전 수집 흐름에서는 필수 파일이 아닙니다.
+
+## 기본 실행 흐름
+
+### 1. 약관과 정책 수집
+
+```bash
+python search_tos_fineprint.py --service "넷플릭스"
+```
+
+수집 결과는 기본적으로 다음 위치에 저장됩니다.
+
+```text
+RAG/terms/<서비스명>/knowledge_base.jsonl
+```
+
+조건을 만족하는 대표 이용약관은 기존 파이프라인과의 호환을 위해 `terms.txt`로도 저장될 수 있습니다.
+
+이미 준비된 TXT, PDF, JSON 문서만 사용한다면 이 단계는 생략할 수 있습니다.
+
+### 2. DB 인제스트
+
+```bash
 python ingest_rag.py
-(같은 source는 기존 청크 삭제 후 재삽입)  
-　　　　　　　↓ <br>
-ChromaDB에 저장됨 (search_utils로 검색 가능)<br>
+```
 
-※ `ingest_all()` 실행이 끝나면, RAG 폴더에서 삭제되거나 이름이 바뀐 파일의 잔존 청크도 자동으로 정리됩니다 (`sweep_stale_sources`).
+`RAG` 폴더의 TXT, PDF, JSON, JSONL 파일을 읽어 ChromaDB에 저장합니다.
 
----
+### 3. DB 및 검색 검증
+
+```bash
+python verify_rag.py
+```
+
+다음 항목을 확인합니다.
+
+- 전체 청크 수
+- 파일별 `doc_subtype` 분류
+- 인제스트 스키마 버전
+- `article` 및 `article_no` 추출 결과
+- 서비스 필터 동작
+- 대표 질의의 기대 조항 검색 순위
 
 ## RAG 폴더 구조
 
-RAG/  
-├── law/ # 법령  
-　├── 개인정보보호법.txt  
-　└── 전자상거래법.txt  
-├── guideline/ # 정부 소비자보호 지침  
-　└── 개인정보처리방침작성지침.txt  
-├── terms/ # 서비스 약관  
-　├── 넷플릭스/  
-　├── 카카오/  
-　├── 쿠팡/  
-　├── 유튜브/  
-　├── 티빙/  
-　└── 한국소비자원/  
-　　└── faq.json
+```text
+RAG/
+├── law/
+│   ├── 개인정보보호법.txt
+│   └── 전자상거래법.txt
+├── guideline/
+│   └── 개인정보처리방침작성지침_2026/
+├── faq/
+│   └── 한국소비자원/
+│       └── faq.json
+└── terms/
+    ├── 넷플릭스/
+    │   ├── 이용약관.txt
+    │   ├── 개인정보처리방침.pdf
+    │   └── knowledge_base.jsonl
+    ├── 카카오/
+    ├── 쿠팡/
+    ├── 유튜브/
+    └── 티빙/
+```
 
-※ FAQ는 각 서비스 폴더에 자유롭게 둘 수 있습니다.
-예) terms/넷플릭스/faq.json
+FAQ JSON은 `RAG/faq/<출처>/` 또는 `RAG/terms/<서비스>/` 아래에 둘 수 있습니다.
 
-※ `service_name`은 구독 서비스명(넷플릭스/카카오/쿠팡/유튜브/티빙) 외에, FAQ 등 일반 참고자료의 출처(예: `한국소비자원`)도 포함할 수 있습니다. 검색 필터를 "5개 구독 서비스 중 하나"로만 가정하고 짜지 않도록 주의하세요.
+## 지원 파일 형식
 
-**파일명 규칙 - `doc_subtype` 자동 추론:**
-- `privacy`, `개인정보` 포함 → `privacy_policy`
-- `refund`, `환불`, `취소` 포함 → `refund_policy`
-- `payment`, `결제`, `자동결제` 포함 → `payment_policy`
-- `terms`, `이용약관`, `서비스약관` 포함 → `terms_of_use`
-- 매칭 안 됨 → `unknown`
+| 형식 | 처리 방식 |
+|---|---|
+| `.txt` | 인코딩 감지 후 문서 구조에 따라 청킹 |
+| `.pdf` | 텍스트 추출 후 필요하면 OCR 시도 |
+| `.json` | FAQ 질문·답변을 항목별 청크로 저장 |
+| `.jsonl` | 크롤러가 수집한 약관·정책 문서를 문서별로 인제스트 |
 
-FAQ(`.json`)의 경우, 항목별 `category` 필드가 위 4개 값과 정확히 일치할 때만 그대로 사용하고, 그 외(예: `"FAQ"` 같은 일반 라벨)에는 질문+답변 텍스트에서 같은 키워드로 재추론합니다.
+## 청킹 전략
 
----
+TXT와 PDF 문서는 다음 우선순위로 청킹합니다.
 
-## 청킹 전략 (자동 선택)
+| 우선순위 | 형식 | 예시 | 적용 대상 |
+|---|---|---|---|
+| 1 | 한국어 조문 | `제12조`, `제12조의3` | law, terms |
+| 2 | 숫자 아웃라인 | `2.`, `2.7.`, `10.3.1.` | law, terms |
+| 3 | 행정지침 번호 목록 | `1.`, `2.`, `3.` | guideline |
+| 4 | 소제목 | `[계약 해지]` | terms, guideline |
+| 5 | 글자 수 기반 fallback | 1,000자 단위 | 모든 문서 |
 
-문서 타입에 따라 **우선순위 기반 청킹**이 자동으로 적용됩니다 (`.txt`, `.pdf` 대상):
+추가 처리:
 
-| 우선순위 | 형식 | 예시 | 대상 |
-|---------|------|------|------|
-| 1순위 | 제O조 형식 | `제1조 (목적)` | law, terms |
-| 2순위 | 숫자 아웃라인 | `1. Title` / `1.1. Subtitle` | law, terms |
-| 3순위 | 번호 목록 (행정지침) | `1. / 2. / 3.` | guideline |
-| 4순위 | 소제목 기반 | `[소제목]` | terms, guideline |
-| 5순위 | 글자 수 기반 (fallback) | 1000자 단위 분할 | 모든 문서 |
+- 기본 overlap은 120자입니다.
+- 1,500자를 초과한 청크는 재분할합니다.
+- 120자 미만의 청크는 주변 청크와 병합합니다.
+- 연도 `2026.`처럼 4자리로 시작하는 값은 조항 번호로 인식하지 않습니다.
+- FAQ JSON은 질문·답변 한 항목을 하나의 청크로 저장합니다.
 
-**⚠️ JSON(FAQ) 파일은 이 청킹 전략을 거치지 않습니다.** 배열의 각 항목이 이미 완결된 Q&A 단위이므로, 항목 하나 = 청크 하나로 그대로 저장됩니다 (`제O조`/소제목 분리 로직 미적용).
+## 문서 종류 자동 분류
 
-**청킹 후 처리 (txt/pdf만 해당):**
-- `split_long_chunks()`: 1500자 초과 청크 재분할
-- `merge_short_chunks()`: 120자 미만 청크 통합 (초소형 조각 방지)
+TXT와 PDF는 파일명을 소문자로 변환한 뒤 다음 키워드로 `doc_subtype`을 추론합니다.
 
-👉 **매 실행마다 같은 source의 기존 청크를 삭제하고 재삽입** (중복 방지)
+| `doc_subtype` | 대표 키워드 |
+|---|---|
+| `terms_of_use` | 이용약관, 서비스약관, 이용규칙, terms, terms_of_use, terms-of-use |
+| `privacy_policy` | 개인정보, 프라이버시, privacy |
+| `refund_policy` | 환불, 취소, 해지, refund, cancellation |
+| `payment_policy` | 결제, 자동결제, 정기결제, payment, billing, renewal |
+| `unknown` | 일치하는 키워드가 없는 경우 |
 
----
+전체 이용약관 파일이 환불·결제 정책으로 잘못 분류되지 않도록 `terms_of_use` 키워드를 우선 검사합니다.
 
-# DB 모듈
+크롤러 JSONL은 파일명이 아니라 JSONL의 `document_type`을 다음과 같이 변환합니다.
 
-## 사전 준비
+```text
+terms               → terms_of_use
+privacy             → privacy_policy
+refund_cancellation → refund_policy
+billing_autorenewal → payment_policy
+platform_refund     → refund_policy
+```
+
+FAQ의 `category`가 위 `doc_subtype` 값과 정확히 일치하면 해당 값을 사용합니다. 그 외에는 질문과 답변의 키워드로 다시 추론합니다.
+
+## 조항 메타데이터
+
+한국어 조문, 영문 숫자 섹션 및 대괄호 소제목을 지원합니다.
+
+```text
+제12조의3
+→ article="제12조의3"
+→ article_no="12조의3"
+
+2.7. Refund Requests
+→ article="2.7."
+→ article_no="2.7"
+
+[계약 해지]
+→ article="[계약 해지]"
+→ article_no="unknown"
+```
+
+번호가 없는 소제목은 `article`에는 저장하지만 번호 필드인 `article_no`에는 넣지 않습니다.
+
+## 중복 및 갱신 처리
+
+일반 문서는 전체 본문의 `document_hash`와 인제스트 스키마 버전을 확인합니다.
+
+```text
+같은 source + 같은 document_hash + 같은 schema
+→ 재임베딩 없이 정상 스킵
+
+같은 source + 변경된 본문 또는 변경된 schema
+→ 기존 청크 삭제 후 재인제스트
+
+다른 source + 같은 서비스 + 같은 본문
+→ 중복 문서로 정상 스킵
+```
+
+현재 인제스트 스키마 버전은 다음과 같습니다.
+
+```python
+INGEST_SCHEMA_VERSION = 5
+```
+
+청킹 방식이나 메타데이터 구조가 변경되면 이 버전을 올려 기존 문서를 한 번 다시 인제스트합니다. 같은 본문과 같은 버전으로 다시 실행하면 일반 문서는 `[SKIP] 변경되지 않은 문서` 로그와 함께 정상 스킵됩니다.
+
+FAQ JSON은 현재 실행할 때마다 기존 FAQ 청크를 삭제한 후 재삽입합니다.
+
+## 주요 메타데이터
+
+| 필드 | 값 예시 | 설명 |
+|---|---|---|
+| `type` | `law`, `guideline`, `terms`, `faq` | 문서의 상위 유형 |
+| `doc_subtype` | `terms_of_use`, `refund_policy` | 서비스 문서의 세부 유형 |
+| `service_name` | `넷플릭스`, `티빙`, `none` | 서비스 또는 자료 출처 |
+| `source` | 파일 경로, URL, `pasted::...` | 원본 식별자 |
+| `source_file` | `이용약관.pdf` | 표시용 원본 이름 |
+| `source_kind` | `file`, `url`, `pasted`, `web_html`, `web_pdf` | 문서가 들어온 경로 |
+| `scope` | `service_specific`, `shared` | 특정 서비스 전용 또는 공통 정책 |
+| `article` | `제12조`, `2.7.`, `[계약 해지]` | 표시용 조항 또는 제목 |
+| `article_no` | `12조`, `2.7`, `unknown` | 검색·필터용 조항 번호 |
+| `chunk_index` | `0` | 문서 내 청크 순서 |
+| `content_hash` | 해시 문자열 | 청크 단위 내용 식별자 |
+| `document_hash` | 해시 문자열 | 문서 단위 중복 및 변경 감지 |
+| `ingest_schema_version` | `5` | 인제스트 구조 버전 |
+| `updated_at` | ISO 8601 시각 | 마지막 저장 시각 |
+
+FAQ에는 추가로 다음 메타데이터가 저장됩니다.
+
+| 필드 | 설명 |
+|---|---|
+| `question` | 질문 원문 |
+| `answer` | 답변 원문 |
+
+`scope="shared"`는 특정 서비스 전용이 아니라 여러 서비스에 공통 적용되는 정책을 의미합니다. 답변 생성 시 해당 사실을 함께 고려해야 합니다.
+
+## DB 설정
+
+인제스트와 검색은 반드시 동일한 설정을 사용해야 합니다.
 
 ```python
 from config import DB_PATH, COLLECTION_NAME, EMBEDDING_MODEL
 ```
 
-DB 접속/검색 코드에서 위 3개 값을 직접 하드코딩하지 말고 **반드시 `config.py`에서 import**해서 쓰세요. <br>
-임베딩 모델이 인제스트 때와 검색 때가 다르면 벡터 공간이 어긋나서 검색이 전부 이상하게 나옵니다.
+임베딩 모델이 서로 다르면 저장된 문서와 질문이 다른 벡터 공간을 사용하게 되어 검색 품질이 크게 저하될 수 있습니다.
+
+컬렉션은 `search_utils.py`에서 생성하고 `ingest_rag.py`가 같은 객체를 재사용합니다.
 
 ```python
-import chromadb
-from chromadb.utils import embedding_functions
-from config import DB_PATH, COLLECTION_NAME, EMBEDDING_MODEL
-
-client = chromadb.PersistentClient(path=DB_PATH)
-collection = client.get_collection(
-    name=COLLECTION_NAME,
-    embedding_function=embedding_functions.SentenceTransformerEmbeddingFunction(
-        model_name=EMBEDDING_MODEL
-    ),
-)
+from search_utils import collection
 ```
 
----
+## 주요 인제스트 함수
 
-## 사용 가능한 함수
+### `check_document_exists(service_name, doc_subtype=None)`
 
-### 1. `check_document_exists(service_name, doc_subtype=None)`
+해당 서비스의 `type="terms"` 문서가 DB에 존재하는지 확인합니다.
+
+- `doc_subtype`을 생략하면 해당 서비스의 약관·정책 문서 중 하나라도 존재할 때 `True`를 반환합니다.
+- `doc_subtype="terms_of_use"`를 지정하면 이용약관만 확인합니다.
+- FAQ, 법령, 행정지침은 존재 여부 판단에서 제외합니다.
 
 ```python
-check_document_exists(service_name: str, doc_subtype: str | None = None) -> bool
+from ingest_rag import check_document_exists
+
+check_document_exists("넷플릭스")
+check_document_exists("넷플릭스", "terms_of_use")
+check_document_exists("넷플릭스", "privacy_policy")
 ```
 
-* 해당 서비스의 (특정 종류) 문서가 DB에 존재하는지 확인
-* `doc_subtype`을 생략하면 그 서비스의 아무 문서(이용약관이든 개인정보처리방침이든)나 있으면 `True`
-* `doc_subtype`을 지정하면 그 종류만 정확히 체크 (예: 이용약관은 없는데 개인정보처리방침만 있는 경우를 구분 가능)
-* **반환값**: `True` / `False`만 나옵니다. 예외 안 던짐.
+### `ingest_from_url(...)`
+
+URL에서 이미 추출한 본문을 DB에 저장합니다. 이 함수는 직접 웹 요청을 수행하지 않습니다.
 
 ```python
-check_document_exists("넷플릭스")                          # 넷플릭스 문서가 뭐든 하나라도 있으면 True
-check_document_exists("넷플릭스", "terms_of_use")           # 이용약관만 콕 집어서 확인
-check_document_exists("넷플릭스", "privacy_policy")         # 개인정보처리방침만 콕 집어서 확인
-```
+from ingest_rag import ingest_from_url
 
-`doc_subtype`으로 쓸 수 있는 값: `terms_of_use`, `privacy_policy`, `refund_policy`, `payment_policy`, `unknown`
-
----
-
-### 2. `ingest_from_url(url, service_name, extracted_text, doc_type="terms", doc_subtype="terms_of_use")`
-
-```python
 ingest_from_url(
-    url: str,
-    service_name: str,
-    extracted_text: str,
-    doc_type: str = "terms",
-    doc_subtype: str = "terms_of_use",
-) -> bool
-```
-
-* URL에서 추출한 텍스트를 DB에 저장
-* **반환값**: 저장 성공하면 `True`, 텍스트가 비어있거나 청킹 결과가 없으면 `False`
-* **⚠️ 이 두 파라미터는 값 검증이 있습니다:**
-  * `service_name`이 빈 문자열이면 `ValueError` 발생
-  * `doc_type`이 `{"law", "guideline", "terms"}` 중 하나가 아니면 `ValueError` 발생 (오타/대소문자 주의 — `"Terms"`, `"term"` 다 에러남)
-  * **`doc_type="faq"`는 이 함수로 만들 수 없습니다** — `faq` 타입은 `RAG/.../*.json` 파일을 통한 일괄 인제스트(`ingest_all()`)로만 생성됩니다.
-* 이미 같은 `url`로 저장된 게 있으면, 호출 시 **기존 청크를 지우고 새로 저장**합니다 (중복 안 쌓임 — 재크롤링해서 다시 넣어도 안전).
-
-```python
-ingest_from_url(
-    url="https://www.coupang.com/np/policies/loyalty",
-    service_name="쿠팡",
-    extracted_text=크롤링해서_뽑은_본문_텍스트,
+    url="https://example.com/terms",
+    service_name="서비스명",
+    extracted_text="추출한 약관 본문",
+    doc_type="terms",
     doc_subtype="terms_of_use",
 )
 ```
 
----
+`service_name`이 비어 있거나 `doc_type`이 `law`, `guideline`, `terms` 중 하나가 아니면 `ValueError`가 발생합니다.
 
-### 3. `ingest_from_pasted_text(service_name, pasted_text, doc_type="terms", doc_subtype="terms_of_use")`
+### `ingest_from_pasted_text(...)`
 
-```python
-ingest_from_pasted_text(
-    service_name: str,
-    pasted_text: str,
-    doc_type: str = "terms",
-    doc_subtype: str = "terms_of_use",
-) -> bool
-```
-
-* URL에서 약관 추출 실패 시, 사용자가 직접 붙여넣은 텍스트를 DB에 저장
-* 반환값/검증 규칙(`doc_type="faq"` 불가 포함)은 `ingest_from_url`과 동일
+사용자가 직접 제공한 텍스트를 DB에 저장합니다.
 
 ```python
+from ingest_rag import ingest_from_pasted_text
+
 ingest_from_pasted_text(
     service_name="티빙",
-    pasted_text=사용자가_붙여넣은_텍스트,
+    pasted_text="사용자가 제공한 약관 본문",
     doc_subtype="refund_policy",
 )
 ```
 
----
+### `ingest_crawled_jsonl(path)`
 
-## DB 상태 확인
-
-`import`해서 쓰는 함수가 아니라 **터미널에서 직접 실행하는 스크립트**입니다.
-
-```bash
-python check_db_status.py
-```
-
-DB 상태를 한눈에 확인:
-
-- 전체 청크 수
-- 서비스별 청크 수
-- 문서 타입(type)별 청크 수
-- doc_subtype별 청크 수
-- source_kind별 청크 수 (file/url/pasted)
-- scope별 청크 수 (service_specific/shared)
-- 구버전 스키마 잔존 여부 체크 ⚠️
-
----
-
-## 검색 시 참고할 메타데이터 필드
-
-저장된 모든 청크에는 아래 메타데이터가 붙어있어서, `collection.get()`/`collection.query()`의 `where` 필터로 활용 가능합니다.
-
-| 필드 | 값 예시 | 설명 |
-|---|---|---|
-| `type` | `law` / `guideline` / `terms` / `faq` | 법령 / 소비자보호 지침 / 서비스 약관 / 질의응답 |
-| `doc_subtype` | `terms_of_use` / `privacy_policy` / `refund_policy` / `payment_policy` / `unknown` | 문서 종류 |
-| `service_name` | `넷플릭스`, `쿠팡` 등 (law/guideline은 `none`, FAQ는 출처명) | 서비스명 또는 자료 출처명 |
-| `source` | 파일경로 / URL / `pasted::...` | 원본 식별자 |
-| `source_kind` | `file` / `url` / `pasted` | 어떤 경로로 들어왔는지 |
-| `scope` | `service_specific` / `shared` | ⚠️ 아래 참고 |
-| `article` | `"1조"` 또는 `"unknown"` | 조문 번호 (제O조 형식 문서만) |
-| `chunk_index` | 정수 | 문서 내 청크 순서 |
-
-### FAQ 문서 메타데이터
-`type="faq"`인 문서에서만 사용됩니다.
-
-| 필드 | 값 예시 | 설명 |
-|---|---|---|
-| `question` | `"미성년자 피해 시 어떻게 되나요?"` | 질문 원문 (인용용) |
-| `answer` | `"법정대리인이 대신 신청 가능합니다."` | 답변 원문 (인용용) |
-
-**⚠️ `scope="shared"` 주의사항**: 유튜브 개인정보처리방침처럼 "구글 전체 서비스에 공통 적용"되는 문서는 자동으로 `scope="shared"`가 붙습니다.
-이런 문서는 유튜브와 무관한 내용(Gmail, 검색 등)이 섞여 있을 수 있으니, 검색 결과에 이 필드가 `shared`로 나오면 답변 생성 시
-"이 조항은 구글 서비스 전반에 적용되는 내용"이라는 걸 참고해서 처리해주세요.
+`search_tos_fineprint.py`가 생성한 `knowledge_base.jsonl`을 DB에 저장합니다.
 
 ```python
-# 필터링 예시
-collection.get(where={"$and": [{"service_name": "넷플릭스"}, {"type": "terms"}]})
+from pathlib import Path
+from ingest_rag import ingest_crawled_jsonl
+
+ingest_crawled_jsonl(
+    Path("RAG/terms/넷플릭스/knowledge_base.jsonl")
+)
 ```
+
+## 검색 사용 예시
+
+```python
+from search_utils import hybrid_search
+
+results = hybrid_search(
+    query="티빙캐시 환불은 어떻게 하나요?",
+    service_name="티빙",
+    doc_type="terms",
+    n_results=5,
+)
+
+for result in results:
+    print(result["metadata"].get("article"))
+    print(result["text"])
+```
+
+현재 검색은 Sentence Transformer 기반 Dense 검색 결과에 도메인 키워드 일치 가중치를 적용해 재정렬합니다. BM25, RRF 및 Cross-Encoder reranker는 향후 고도화 항목입니다.
+
+## 검증 결과
+
+현재 대표 질의 검증 기준은 다음과 같습니다.
+
+- 티빙 캐시 환불: `제12조`, `제17조`가 상위 5개에 포함
+- 넷플릭스 환불: `2.7. Refund Requests`가 상위 3개에 포함
+- 유튜브 구독 취소·환불: `4. 취소 및 환불`이 상위 5개에 포함
+
+최근 검증 결과:
+
+```text
+3/3 통과
+```
+
+## 주의사항
+
+- `RAG_PATH`가 상대 경로이므로 프로젝트 루트에서 `ingest_rag.py`를 실행하세요.
+- DB를 다시 만들기 전에는 기존 `db` 폴더를 백업하는 것을 권장합니다.
+- `scope="shared"`인 문서는 여러 서비스에 공통 적용되는 정책일 수 있습니다.
+- 긴 조항이 여러 청크로 분리되면 일부 후속 청크의 `article`이 `unknown`일 수 있습니다.
+- FAQ JSON은 일반 문서와 달리 현재 변경 감지 스킵을 적용하지 않습니다.
+- HF Hub 미인증 경고는 다운로드 제한에 관한 경고입니다. 모델이 정상 로딩되면 검색 실행 오류는 아닙니다.
+
