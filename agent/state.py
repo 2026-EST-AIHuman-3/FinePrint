@@ -12,7 +12,7 @@ class FinePrintState(TypedDict):
     # False → FinePrint 범위 밖 질문
 
     terms_context: list[str]
-    consumer_protection_context: list[str]
+    consumer_protection_context: str
 
     draft_answer: str
 

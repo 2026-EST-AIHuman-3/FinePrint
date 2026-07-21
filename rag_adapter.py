@@ -36,6 +36,60 @@ def format_search_results(results: list[dict]) -> str:
 
     return "\n\n".join(formatted)
 
+# 다른 서비스의 사례가 일반 가이드라인 검색 결과에 섞이는 것을 방지
+KNOWN_SERVICE_NAMES = {
+    "넷플릭스",
+    "네이버",
+    "카카오",
+    "쿠팡",
+    "티빙",
+    "유튜브",
+    "웨이브",
+    "디즈니플러스",
+    "배민",
+    "코웨이",
+}
+
+
+def filter_other_service_examples(
+    results: list,
+    current_service: str,
+) -> list:
+    filtered_results = []
+
+    for result in results:
+        # hybrid_search 결과가 dict인 경우
+        if isinstance(result, dict):
+            content = (
+                result.get("document")
+                or result.get("content")
+                or result.get("page_content")
+                or ""
+            )
+            metadata = result.get("metadata", {})
+        else:
+            # LangChain Document 형태인 경우
+            content = getattr(result, "page_content", "")
+            metadata = getattr(result, "metadata", {}) or {}
+
+        other_services = [
+            service
+            for service in KNOWN_SERVICE_NAMES
+            if service != current_service
+            and service in content
+        ]
+
+        if other_services:
+            print(
+                "[FILTER] 다른 서비스 사례 제외:",
+                other_services,
+                metadata.get("source", "출처 없음"),
+            )
+            continue
+
+        filtered_results.append(result)
+
+    return filtered_results
 
 def retrieve_rag_context(
     service_name: str,
@@ -51,8 +105,8 @@ def retrieve_rag_context(
 
     terms_results = hybrid_search(
         query=search_query,
-        n_results=3,
-        candidate_pool=15,
+        n_results=6,
+        candidate_pool=20,
         doc_type="terms",
         service_name=service_name,
     )
@@ -62,6 +116,11 @@ def retrieve_rag_context(
         n_results=3,
         candidate_pool=15,
     )
+
+    consumer_results = filter_other_service_examples(
+        results=consumer_results,
+        current_service=service_name,
+    )[:3]
 
     return {
         "terms_context": format_search_results(terms_results),
