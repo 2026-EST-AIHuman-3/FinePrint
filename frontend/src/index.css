@@ -1,0 +1,35 @@
+@import url('https://fonts.googleapis.com/css2?family=Hanken+Grotesk:ital,wght@0,100..900;1,100..900&family=Inter:ital,opsz,wght@0,14..32,100..900;1,14..32,100..900&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200');
+@import "tailwindcss";
+
+@theme {
+  --color-primary: #2a6b38;
+  --color-primary-container: #7dc084;
+  --color-on-primary: #ffffff;
+  --color-on-primary-container: #064f1f;
+  --color-background-mint: #eaf8ee;
+  --color-surface-white: #ffffff;
+  --color-on-surface: #1b1c1c;
+  --color-on-surface-variant: #404940;
+  --color-outline-variant: #c0c9bd;
+  --color-border-muted: #e5ebe6;
+  --color-sidebar-bg: #ffffe8;
+  
+  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-headline: "Hanken Grotesk", sans-serif;
+}
+
+.material-symbols-outlined {
+  font-family: 'Material Symbols Outlined';
+  font-weight: normal;
+  font-style: normal;
+  font-size: 24px;
+  line-height: 1;
+  letter-spacing: normal;
+  text-transform: none;
+  display: inline-block;
+  white-space: nowrap;
+  word-wrap: normal;
+  direction: ltr;
+  -webkit-font-smoothing: antialiased;
+}

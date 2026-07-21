@@ -96,3 +96,16 @@ uvicorn api:app --host 0.0.0.0 --port 8000 --reload
 
 서비스명 준비 결과의 `service_documents_ready`가 `false`이면 UI가 URL 또는
 문서 입력 화면으로 전환합니다.
+
+React 화면은 `frontend/`에 있습니다. Python API를 먼저 실행한 뒤 새 터미널에서
+다음 명령으로 UI를 실행합니다.
+
+```powershell
+Set-Location frontend
+Copy-Item .env.example .env
+npm install
+npm run dev
+```
+
+기본 접속 주소는 `http://localhost:3000`, Python API 주소는
+`http://127.0.0.1:8000`입니다.
