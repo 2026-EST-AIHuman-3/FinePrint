@@ -76,3 +76,23 @@ from Siyeong.ensure_service_ingested import ingest_user_document, ingest_user_ur
 ingest_user_document(path, service_name="넷플릭스")
 ingest_user_url(url, service_name="넷플릭스", document_type="terms")
 ```
+
+## React UI 연결용 API
+
+React UI는 Python 모듈을 직접 실행하지 않고 `api.py`의 HTTP API를 호출합니다.
+
+```powershell
+Copy-Item .env.example .env
+# .env에 OPENAI_API_KEY와 필요 시 TAVILY_API_KEY 입력
+uvicorn api:app --host 0.0.0.0 --port 8000 --reload
+```
+
+주요 엔드포인트는 다음과 같습니다.
+
+- `POST /services/prepare`: DB 확인 후 없으면 자동 수집·인제스트
+- `POST /services/url`: 사용자가 입력한 공식 URL 수집·인제스트
+- `POST /services/document`: PDF/TXT 업로드·인제스트
+- `POST /questions`: Hybrid RAG 검색과 검증 Agent 실행
+
+서비스명 준비 결과의 `service_documents_ready`가 `false`이면 UI가 URL 또는
+문서 입력 화면으로 전환합니다.
