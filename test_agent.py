@@ -29,11 +29,11 @@ result = graph.invoke(initial_state)
 
 # print(result)
 
-print("\n===== 검색된 약관 원문 =====")
-print(result.get("terms_context", ""))
+# print("\n===== 검색된 약관 원문 =====")
+# print(result.get("terms_context", ""))
 
-print("\n===== 검색된 소비자 보호 근거 =====")
-print(result.get("consumer_protection_context", ""))
+# print("\n===== 검색된 소비자 보호 근거 =====")
+# print(result.get("consumer_protection_context", ""))
 
 print("\n===== 최종 누적 로그 =====")
 for log in result.get("round_logs", []):
@@ -47,7 +47,7 @@ for log in result.get("round_logs", []):
 print("\n===== 최종 답변 =====")
 print(result["final_answer"])
 
-# png_data = graph.get_graph().draw_mermaid_png()
+png_data = graph.get_graph().draw_mermaid_png()
 
-# with open("fineprint_workflow.png", "wb") as f:
-#     f.write(png_data)
+with open("fineprint_workflow.png", "wb") as f:
+    f.write(png_data)
