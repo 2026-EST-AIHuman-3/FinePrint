@@ -1,0 +1,6 @@
+{
+  "name": "FinePrint",
+  "description": "구독 서비스 약관 분석 및 문제 해결 안내 서비스 - AI Legal Assistant",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
