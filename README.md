@@ -109,3 +109,6 @@ npm run dev
 
 기본 접속 주소는 `http://localhost:3000`, Python API 주소는
 `http://127.0.0.1:8000`입니다.
+
+최종 배포
+https://fineprint-199065598070.asia-east1.run.app
