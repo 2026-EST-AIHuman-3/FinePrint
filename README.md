@@ -45,7 +45,7 @@ FinePrint는 구독 서비스의 해지·환불·자동결제 문제에 대해
 - 문제 상황에 대한 조건부 결론 제공
 - 해지일·결제일·서비스 이용 여부 등 확인사항 안내
 - 고객센터 문의 방법과 준비 자료 제시
-- 실제 사용한 조항, 원문과 출처 링크 제공
+- 실제 사용한 조항과 원문, 출처 링크 제공
 
 ---
 ## 4. 사용자 흐름
@@ -87,7 +87,7 @@ FinePrint는 검색된 문서를 바탕으로 답변을 생성한 뒤,
 | `PASS` | 답변이 검색된 근거와 일치함 | 최종 답변 생성 |
 | `REGENERATE` | 근거는 충분하지만 답변 표현이 부정확하거나 과도하게 단정적임 | 기존 근거를 유지하고 답변만 재생성 |
 | `RETRIEVE_AGAIN` | 사용자의 상황을 판단하기 위한 근거가 부족함 | 검색 전략을 보완해 관련 문서를 다시 검색 |
-| `INSUFFICIENT` | 최대 재시도 후(2회)에도 필요한 근거를 확보하지 못함 | 가능 여부를 단정하지 않고 근거 부족 안내 제공 |
+| `INSUFFICIENT` | 설정된 최대 재시도 횟수에 도달한 후에도 필요한 근거를 확보하지 못함 | 가능 여부를 단정하지 않고 근거 부족 안내 제공 |
 
 ### 재시도 제한
 
@@ -103,7 +103,7 @@ FinePrint는 검색된 문서를 바탕으로 답변을 생성한 뒤,
 
 | 구분 | 기술 | 활용 |
 |---|---|---|
-| UI | React 19, TypeScript, Vite 6, Tailwind CSS 4 | 사용자 입력, 분석 결과 및 이력 화면 구현 |
+| UI | React, TypeScript, Vite, Tailwind CSS | 사용자 입력, 분석 결과 및 이력 화면 구현 |
 | API | FastAPI, Uvicorn, Pydantic | 문서 수집과 Agent 실행 연결 |
 | Agent | LangGraph, LangChain, OpenAI GPT-4o | 상태 관리, 답변 생성, 검증 및 재시도 |
 | RAG | ChromaDB, sentence-transformers | 문서 임베딩 및 검색 |
@@ -274,9 +274,6 @@ npm run dev
 | `POST` | `/services/document` | PDF·TXT 문서 업로드 및 인제스트 |
 | `POST` | `/questions` | Hybrid RAG 검색과 검증 Agent 실행 |
 
-#### 배포 주소
-
-[FinePrint 서비스 바로가기](https://fineprint-199065598070.asia-east1.run.app/)
 
 <details>
 <summary><strong>개발자용 개별 모듈 실행 방법</strong></summary>
