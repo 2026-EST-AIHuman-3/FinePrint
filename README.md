@@ -320,5 +320,5 @@ python -m jhc.search_fineprint_v2 --service 넷플릭스 `
 ## 14. 시연 및 발표 자료
 
 - [FinePrint 서비스 바로가기](https://fineprint-199065598070.asia-east1.run.app/)
-- [시연 영상](시연_영상_URL)
+- [시연 영상](https://youtu.be/MkcXueyKCZk)
 - [발표 자료 PDF](./docs/FinePrint_presentation.pdf)
