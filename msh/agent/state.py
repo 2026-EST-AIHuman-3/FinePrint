@@ -22,7 +22,7 @@ class FinePrintState(TypedDict):
 
     verification_status: str
     verification_reason: str
-    missing_evidence: str
+    missing_evidence: list[str]
     suggested_action: str
 
     improvement_instruction: str
