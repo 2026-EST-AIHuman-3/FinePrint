@@ -1,6 +1,7 @@
 # FinePrint Agent
 ### LangGraph 기반 근거 검증 및 실패 복구 흐름 설계
-: 검색된 근거와 생성 답변의 일치 여부를 검증하고, 실패 원인에 따라 재생성·재검색·근거 부족 안내로 분기하는 Agent를 설계했습니다.
+> 검색된 근거와 생성 답변의 일치 여부를 검증하고,
+> 실패 원인에 따라 재생성·재검색·근거 부족 안내로 분기하는 Agent를 설계했습니다.
 
 ## 1. 담당 역할
 **LangGraph 기반 근거 검증 Agent 흐름 설계 및 구현**
@@ -29,10 +30,10 @@ msh/
 └─ test_agent.py
 ```
 
-- `agent/workflow.py`: LangGraph 흐름 및 조건부 분기 구성
-- `agent/nodes.py`: 의도 분류, 답변 생성, 검증 노드 구현
-- `agent/state.py`: Agent 상태 정의
-- `agent/schemas.py`: 구조화 출력 스키마 정의
+- `workflow.py`: LangGraph 흐름 및 조건부 분기 구성
+- `nodes.py`: 의도 분류, 답변 생성, 검증 노드 구현
+- `state.py`: Agent 상태 정의
+- `schemas.py`: 구조화 출력 스키마 정의
 - `../rag_adapter.py`: RAG 검색 결과를 Agent 입력 형식으로 연결
 - `../test_agent.py`: Agent 통합 실행 및 테스트
 
@@ -45,11 +46,11 @@ msh/
 검증 결과와 실패 원인에 따라 최종 답변·재생성·재검색·근거 부족 안내 경로로 분기합니다.
 
 ![FinePrint Agent 동작 흐름](../../images/agent-workflow.png)
-- `PASS`: 근거와 답변이 일치하면 최종 답변 생성
-- `REGENERATE`: 근거는 충분하지만 표현이 부정확하면 답변만 재생성
-- `RETRIEVE_AGAIN`: 판단 근거가 부족하면 검색 전략을 보완해 재검색
-- `INSUFFICIENT`: 최대 재시도 후에도 근거가 부족하면 확인사항과 필요 자료 안내
-- `OUT_OF_SCOPE`: 지원 범위를 벗어난 질문은 별도 안내 후 종료
+- `pass`: 근거와 답변이 일치하면 최종 답변 생성
+- `regenerate`: 근거는 충분하지만 표현이 부정확하면 답변만 재생성
+- `retrieve_again`: 판단 근거가 부족하면 검색 전략을 보완해 재검색
+- `insufficient`: 최대 재시도 후에도 근거가 부족하면 확인사항과 필요 자료 안내
+- `out_of_scope`: 지원 범위를 벗어난 질문은 별도 안내 후 종료
 
 ## 4. State 구조
 
@@ -67,7 +68,7 @@ State는 크게 다음 다섯 영역으로 구성됩니다.
 | 재시도·출력 | `improvement_instruction`, `retry_count`, `round_logs`, `final_answer` | 개선 지시, 반복 횟수, 실행 이력, 최종 답변 관리 |
 
 <details>
-<summary><strong>FinePrintState 전체 코드 보기</strong></summary>
+<summary><strong>FinePrintState 정의 보기</strong></summary>
 
 ```python
 class FinePrintState(TypedDict):
@@ -87,7 +88,7 @@ class FinePrintState(TypedDict):
 
     verification_status: str
     verification_reason: str
-    missing_evidence: str
+    missing_evidence: list[str]
     suggested_action: str
 
     improvement_instruction: str
@@ -96,6 +97,8 @@ class FinePrintState(TypedDict):
 
     final_answer: dict
 ```
+</details>
+
 ### 설계 포인트
 
 - 모든 노드가 동일한 State를 읽고 필요한 필드만 갱신하도록 구성
@@ -104,8 +107,6 @@ class FinePrintState(TypedDict):
   - `round_logs`는 LangGraph reducer를 이용해 각 라운드의 로그를 덮어쓰지 않고 리스트에 누적합니다.
 - `missing_evidence`와 `suggested_action`을 다음 재시도 전략에 활용
 - `final_answer`는 UI에서 바로 사용할 수 있도록 구조화된 형태로 저장
-
-</details>
 
 ## 5. 주요 노드 및 조건부 분기
 
@@ -143,6 +144,10 @@ class FinePrintState(TypedDict):
 | `regenerate` | `suggested_action == "REGENERATE"` | `generate_answer` |
 | `retrieve_again` | 그 외의 개선 행동 | `retrieve_context` |
 
+> `PASS`, `FAIL`은 검증 상태 값이며,  
+> `REGENERATE`, `RETRIEVE_AGAIN`은 검증 노드가 반환하는 후속 행동 값입니다.  
+> `pass`, `fail`, `regenerate`, `retrieve_again`은 LangGraph에서 다음 노드를 선택하기 위한 분기 경로명입니다.
+
 검증에 실패하면 먼저 `improve_strategy`에서 다음 단계에 적용할
 구체적인 개선 지시를 생성합니다.
 
@@ -155,10 +160,11 @@ class FinePrintState(TypedDict):
 
 ## 6. 핵심 설계 포인트
 ① 답변 생성과 근거 검증 분리
-   - 답변 생성 모델이 스스로 자신의 답변을 확인하도록 하지 않고,
-   - `generate_answer`와 `verify_answer`를 별도 노드로 분리함
+   - 답변 생성과 근거 검증을 하나의 호출에서 처리하지 않고,
+   - `generate_answer`와 `verify_answer`를 별도 노드와 LLM 호출로 분리함
   
-   > 이를 통해 생성된 답변이 검색 근거보다 강하게 단정하거나 근거에 없는 내용을 추가했는지를 독립적으로 검증하도록 구성함
+   > 이를 통해 답변 생성 결과를 별도의 검증 단계에서 독립적으로 확인하고,
+   > 검색 근거보다 강한 단정이나 근거에 없는 내용의 추가를 검출하도록 구성함
 
 ② 검증 실패 원인에 따른 복구 경로 분리
    검증 실패를 모두 동일하게 처리하지 않고 두 가지로 구분했습니다.  
@@ -309,8 +315,8 @@ FinePrint는 문서 수집, RAG 검색, Agent, UI가 서로 다른 모듈로 개
 저는 Agent가 독립적으로 동작할 수 있도록 먼저 임시 검색 문맥을 사용해
 질문 분류, 답변 생성, 검증, 재시도 흐름을 테스트했습니다.
 
-이후 실제 RAG 모듈과 연결하기 위해 다음 입력과 출력 구조를 기준으로
-팀원들과 데이터 형식을 맞췄습니다.
+이후 실제 RAG 모듈과 연결할 수 있도록 다음 입력과 출력 구조를 기준으로
+Agent의 인터페이스를 구성했습니다.
 
 - 입력: `service_name`, `user_question`, `policy_urls`
 - RAG 결과: `terms_context`, `consumer_protection_context`, `knowledge_base_status`
@@ -334,6 +340,6 @@ LangGraph의 상태 관리와 조건부 분기를 실제 문제 해결에 적용
 반복 테스트를 통해 근거보다 강한 표현, 사용자 질문 범위의 확장,  
 최종 답변 단계에서 새로운 사실이 추가되는 문제를 확인하고 프롬프트와 검증 기준을 보완했습니다.
 
-다만 최종 통합 과정에서는 모듈 통합 과정에 집중하면서 전체 연결 구조를 충분히 분석하지 못한 점이 아쉬움으로 남았습니다.
+다만 최종 통합 작업에 집중하면서 전체 연결 구조를 충분히 분석하지 못한 점이 아쉬움으로 남았습니다.
 앞으로는 전체 연결 구조를 다시 분석하고, 다양한 시나리오와 정량 평가 기준을 추가해  
 Agent의 검색 정확도와 근거 일치도를 더 체계적으로 검증하고 싶습니다.
